@@ -1,0 +1,444 @@
+<!---
+title: "AssignmentV2"
+author: "Harshad Kumar Elangovan - 19200349"
+date: "17/11/2019"
+output: html_document
+--->
+<center><font size="6"> **Harshad Kumar Elangovan** </font></center>
+<center><font size="5"> *19200349 || Predictive Analytics Assignment 1*</font> </center>
+</br>
+</br>
+The provided data file "House.csv" contains imformation on the sale of 76 single family homes in Dublin during 2005.Using R, the data is read and analysis is carried out on Price.
+```{r readfile}
+housedata=read.csv("C:\\Users\\harshie\\Documents\\UCD\\Predictive\\Assignment\\house.csv",header=TRUE)
+head(housedata)
+names(housedata)[names(housedata)=='ï..Price']<-'Price'
+head(housedata)
+str(housedata)
+```
+
+## Exploratory Data Analysis
+
+#### 1. Using a boxplot, histogram and summary. Describe the distribution of the sales price of the houses.
+
+```{r housesummary}
+boxplot(housedata$Price,ylab="Scaled Price of House in Euros")
+hist(housedata$Price,,xlab="Scaled Price of House in Euros",breaks = 20,main = "Histogram of House Price")
+summary(housedata$Price)
+```
+
+The graphs and summary of the data shows that the average price of the house is 285.8 (scaled by 1000 Euros) and the price range of most of the house is between 242.8 to 336.8 thousand Euros(1st Quartile and 3rd Quartile).The minimum sale price of the house is 155.5 and the max price is 450 thousand Euros. The box plot suggest that there are no outliers in the given price range. 
+
+</br>
+
+#### 2. Convert all the categorical variables to factors. Using the summary and a boxplot describe how sales prices vary with respect to the number of bedrooms, bathrooms, garage size and school.
+
+```{r factoringCategoricalVar}
+housedata$Bed<-factor(housedata$Bed)
+housedata$Bath<-factor(housedata$Bath)
+housedata$Garage<-factor(housedata$Garage)
+#School is already a factor
+str(housedata)
+```
+
+*Number of Bedrooms*
+```{r boxplotbeds}
+boxplot(housedata[,c("Price")]~housedata[,c("Bed")],ylab = "Price",xlab = "Number of Beds")
+library(psych)
+describeBy(housedata[,c("Price")],housedata[,c("Bed")])
+```
+
+The summary and plots shows that houses of 3 bedrooms were sold the most(43 houses) and its maximum price reached 435 thousand Euros.The price of houses of bedrooms above three were less than the price of 3 bedrooms.This suggest that the price of houses decreases as the number of beds increases.
+The plot also shows that two houses of four bedrooms has unusually high price.
+
+*Number of Bathrooms:*
+
+```{r boxplotbath}
+boxplot(housedata[,c("Price")]~housedata[,c("Bath")],ylab = "Price",xlab = "Number of Bathrooms")
+#library(psych)
+describeBy(housedata[,c("Price")],housedata[,c("Bath")])
+```
+There is not much information about houses with 1 and 1.1 bathrooms since the count is low(1 and 5 respectively).Apart from that, the plot trend suggests that the price of house increases with increase in bathrooms. 
+
+*Garage count:*
+
+```{r boxplotGarage}
+boxplot(housedata[,c("Price")]~housedata[,c("Garage")],ylab = "Price",xlab = "Number of Garage")
+#library(psych)
+describeBy(housedata[,c("Price")],housedata[,c("Garage")])
+```
+
+From the boxplot, we can see that there is a house with unsually high price with no garage.Other than that, the trend suggests increase in house price with increase in garage count.
+
+*School:*
+
+```{r boxplotSchool}
+boxplot(housedata[,c("Price")]~housedata[,c("School")],ylab = "Price",xlab = "School")
+#library(psych)
+describeBy(housedata[,c("Price")],housedata[,c("School")])
+```
+
+From the plot, we see that the Price of houses near High School and NotreDame school are comparatively higher than other four schools. Houses near Alex school have low price compared with other schools.
+
+</br>
+
+#### 3. Using the summary, correlation and the pairs plots discuss the relationship between the response sales price and each of the numeric predictor variables.
+
+```{r EDAPairplot}
+cor(housedata[,c("Price","Size","Year","Lot")])
+#data1<-c("Price","Size","Lot","Year")
+pairs(housedata[,c("Price","Size","Year","Lot")])
+#lines(housedata$Price,fitted.values(data1),col="red")
+```
+
+The pair plots suggests that there is a linear relationship between the response sales price and the numeric predictor variables Size,Year and Lot and there is a positive correlation among each variables with Price. The correlation values are 0.201,0.154 and 0.244 for variables Size,year and Lot respectively. So, as the correlation increases, the price of house also increases.
+</br>
+
+## Regression Model:
+
+#### 1. Fit a multiple linear regression model to the data with sales price as the response and size, lot, bath, bed, year, garage and school as the predictor variables. Write down the equation for this model.
+
+```{r model}
+Rmodel<-lm(Price~Size+Lot+Year+Bath+Bed+Garage+School,data = housedata)
+summary(Rmodel)
+```
+
+The intercept value is negative which is not interpretable. So, the numeric predictor variables can be stardardized by subtracting its mean value and the intercept can be calculated again with the new values.
+
+```{r Standardizing}
+housedata$Size<-housedata$Size-mean(housedata$Size)
+housedata$Lot<-housedata$Lot-mean(housedata$Lot)
+housedata$Year<-housedata$Year-mean(housedata$Year)
+Rmodel<-lm(Price~Size+Lot+Year+Bath+Bed+Garage+School,data = housedata)
+summary(Rmodel)
+```
+
+The equation of this model is,
+
+Price <-beta0 + beta1.Size + beta2.Lot + beta3.Year + beta4.Bath1.1 + beta5.Bath2 + beta6.Bath2.1 + beta7.Bath3 + beta8.Bath3.1 + beta9.Bed3 + beta10.Bed4 + beta11.Bed5 + beta12.Bed6 + beta13.Garage1 + beta14.Garage2 + beta15.Garage3 + beta16.SchoolHigh + beta17.SchoolNotreDame + beta18.SchoolStLouis + beta19.SchoolStMarys + beta20.SchoolStratford +error
+
+(i.e)
+Price<- 376.1016 + 59.4503(Size) + 11.7701(Lot) + 0.5567(Year) + 135.8983(Bath1.1) + 73.9317(Bath2) + 76.9433(Bath2.1) + 98.0694(Bath3) + 85.8037(Bath3.1) + (-228.1052)(Bed3) + (-238.2609)(Bed4) + (-237.6155)(Bed5) + (-255.0211)(Bed6) + (-10.9191)(Garage1) + 18.2435(Garage2) + (-209.9038)(Garage3) + 113.2774(SchoolHigh) + 80.9317(SchoolNotreDame) + 9.0367(SchoolStLouis) + 27.3408(SchoolStMarys) + 31.9254(SchoolStratford)
+</br>
+</br>
+
+#### 2. Interpret the estimate of the intercept term β0.
+
+The estimated intercept value β0 i.e average Price is 376.1016 taking the average values of Size,Lot,Year and the house with 1 bathroom,2 bedrooms,0 Garage which is near to Alex School. This estimate is significant with price as the p-value is less than 0.05 and the 95% confidence interval for this intercept is in the range (376.1016 (+,-)(1.96(51.7258))) ie [274.7190,477.4841].
+</br>
+</br>
+
+#### 3. Interpret the estimate of βsize the parameter associated with ﬂoor size (Size).
+
+The estimate of βsize is 59.4503 ie. for a given values of predictor variables lot, bath, bed, year, garage and school, a 1 unit increase in new size(after subtracting mean(size)) will increase the house price by 59.4503.This estimate is significant and the 95% confidence interval for this variable is in the range (59.4503 (+,-)(1.96(28.9813))) ie [2.6469,116.253648].
+</br>
+</br>
+
+#### 4. Interpret the estimate of βBath1.1 the parameter associated with one and a half bathrooms.
+
+The estimate of βBath1.1 is 135.8983 ie. for a given values of predictor variables lot, size, bed, year, garage and school, a 1 unit increase in bath1.1 will increase the house price by 135.8983.This estimate is significant and the 95% confidence interval for this variable is in the range (135.8983 (+,-)(1.96(49.1990))) ie  [39.4683,232.3284].
+
+</br>
+
+#### 5. Discuss and interpret the eﬀect the predictor variable bed on the expected value of the house prices.
+
+The predictor variable Bed is seperated into four co-efficients as Bed3,Bed4,Bed5 and Bed6.The interpretition of each of these is given below:
+</br>
+
+-The estimate of Bed3 is -228.1052 ie. for a given values of predictor variables lot, size, bath, year, garage and school, a 1 unit increase in  bed3 will decrease the house price by 228.1052.This estimate is significant with price and the 95% confidence interval for this variable is in the range (-228.1052 (+,-)(1.96(70.6732))) ie   [-366.6247,-89.5857].
+</br>
+
+-The estimate of Bed4 is -238.2609 ie. for a given values of predictor variables lot, size, bath, year, garage and school, a 1 unit increase in  bed4 will decrease the house price by 238.2609.This estimate is significant with price and the 95% confidence interval for this variable is in the range (-238.2609 (+,-)(1.96(72.4883))) ie [-380.3379,-96.1838].
+</br>
+
+-The estimate of Bed5 is -237.6155 ie. for a given values of predictor variables lot, size, bath, year, garage and school, a 1 unit increase in  bed5 will decrease the house price by 237.6155.This estimate is significant with price and the 95% confidence interval for this variable is in the range (-237.6155 (+,-)(1.96(76.4733))) ie [-387.5032,-87.7278].
+</br>
+
+-The estimate of Bed6 is -255.0211 ie. for a given values of predictor variables lot, size, bath, year, garage and school, a 1 unit increase in  bed6 will decrease the house price by 255.0211.This estimate is significant with price and the 95% confidence interval for this variable is in the range (-255.0211 (+,-)(1.96(88.0955))) ie [-427.6883,-82.3539].
+
+</br>
+
+#### 6. List the predictor variables that are signiﬁcantly contributing to the expected value of the house prices
+
+From the linear model data, we can see that all the predictor variables are significantly contributing to the expected value of the house price. These variables are listed as,</br> 
+-Bath</br>
+-School</br>
+-Size</br>
+-Lot</br>
+-Garage</br>
+-Bed</br>
+
+
+</br>
+
+#### 7. For each predictor variable what is the value that will lead to the largest expected value of the house prices.
+
+Based on the estimated values, the following values for each predictor variable gives the largest expected value,
+</br>
+Size - 2.896</br>
+Lot - 11</br>
+Bath - 1.1</br>
+Bed - 2</br>
+Garage - 2</br>
+School - High</br>
+</br>
+
+#### 8. For each predictor variable what is the value that will lead to the lowest expected value of the house prices.
+
+Based on the estimated values, the following values for each predictor variable gives the largest expected value,
+</br>
+Size - 1.44</br>
+Lot - 1</br>
+Bath - 1</br>
+Bed - 6</br>
+Garage - 3</br>
+School - Alex</br>
+</br>
+
+#### 9. By looking at the information about the residuals in the summary and by plotting the residuals do you think this is a good model of the expected value of the house prices.
+
+```{r residuals}
+plot(fitted(Rmodel),residuals(Rmodel),xlab = "Fitted values of Model",ylab = "Residuals of Model")
+abline(h=0)
+qqnorm(rstudent(Rmodel))
+qqline(rstudent(Rmodel),col=2)
+summary(Rmodel)
+```
+
+From the plot between Residuals and Fitted values of the model, it suggests that the values are symmetrically distributed and in a constant band.The qqplot also shows that the errors are normally arranged. Also, from the summary of residuals, the median is  0.173 which is close to zero and the 1st and 3rd quantiles are  -21.429 & 24.248. So, this model is a good model for predicting the expected price of the house.
+</br>
+
+#### 10. Interpret the Adjusted R-squared value.
+
+The Adjusted R-squared value indicates how well the data points fits a curve or line. If addition of useful variables in the model improves the model, it will increase the R-squared value and decreases with addition of useless variables to the model. In this model, the Adjusted R-squared value is 0.5125. So,approximately half of the variations is explained by the model's input.
+</br>
+
+#### 11. Interpret the F-statistic in the output in the summary of the regression model. Hint: State the hypothesis being tested, the test statistic and p-value and the conclusion in the context of the problem.
+
+The hypothesis for this model can be 
+
+Null Hypothesis,H0: All the coefficients are zero (ie) beta1=beta2=...=beta20=0
+</br>
+Alternate Hypothesis,Ha: Atleast one coefficient is not zero Beta[Size||Year||Lot||Bath||Bed||Garage||School]!=0
+</br>
+
+F-Statistics checks tests whether any of the independent variables in a  model is significant in the prediction.
+In this model, the p-value is 1.265e-06 which is less than 0.05,hence we reject NUll Hypothesis. Thus this test suggests that any of the independent variables significantly improves the model.
+
+## ANOVA:
+
+#### 1. Compute the type 1 anova table. Interpret the output. Hint: State the hypothesis being tested, the test statistic and p-value and the conclusion in the context of the problem.
+
+Type 1 Analysis of Variance determines whether there is any statistically significant difference in the model by introducing  new variables one by one to the model.
+
+```{r Anova1}
+anova(Rmodel)
+```
+The initial hypothesis will be adding Size to the model.
+
+Null Hypothesis H0:Beta[Size]=0;
+</br>
+Alternate Hypothesis Ha: Beta[Size]!=0;
+</br>
+The anova table shows that there is a significance by adding Size to the model. So it can be added to the model. Now, the second variable Lot will be added to the existing model and the table is compared to check if the new variable fits in the model. If the variable fits, then the next variable untill last variable is added to the existing model and compared. So, it works in a sequential way with one variable at a time. 
+
+From the anova table, it can be seen that Year predictor variable doesnot contribute to the model.
+</br>
+
+#### 2. Which predictor variable does the type 1 anova table suggest you should remove the regression analysis.
+
+From the anova table, it can be seen that Year predictor variable doesnot contribute to the model.It can be removed from the model.
+</br>
+
+#### 3. Compute a type 2 anova table comparing the full model with all predictor variables to the the reduced model with the suggested predictor variable identiﬁed in the previous question removed. Hint: State the hypothesis being tested, the test statistic and p-value and the conclusion in the context of the problem.
+
+```{r AnovaType2}
+Rmodelnew<- lm(Price~Size+Lot+Bath+Bed+Garage+School,data = housedata)
+anova(Rmodel,Rmodelnew)
+```
+Null Hypothesis H0:Beta[Year]=0;
+</br>
+Alternate Hypothesis Ha: Beta[Year]!=0;
+</br>
+The test statistic is the F-Value. From the table above, we see that the p-value is 0.1057 which is greater than 0.05.Thus we fail to reject the Null Hypothesis. This proves that predictor variable "Year" doesnot contribute to the model and it can be removed (ie) beta[Year]=0.
+
+## Diagnostics:
+
+#### 1. Check the linearity assumption by interpreting the added variable plots and component-plus-residual plots. What eﬀect would non-linearity have on the regression model and how might you correct or improve the model in the presence of non-linearity?
+
+```{r Diagnostics1}
+library(car)
+avPlots(Rmodelnew)
+crPlots(Rmodelnew)
+```
+
+The Added variable plot(avPlots) depicts a pictorial format of price with different coefficient variables seperately. Each plot suggest a linear relationship between the response variable Price and each of the predictor variables. All the predictor variabes plots have a positive linear regression except for Bed coefficients and Garbage3 coefficients.Bed and Garbage3 coefficients has a negative linear relationship with the variable Price.
+
+The Component+Residuals plots describes the Linear regression and the smoothness curve for the relationship between the response variable Sale price of the house and each of the predictor variable.</br>
+For numeric variable, there is no difference between residual(pink line) and component(blue dashed) as both the lines coincides with each other.</br>
+For categorical variables, the boxplot shows the significant values for each variable such as bath1.1 is highly significant for Bath, High school is highly significant for school. Hence, the linearity assumption holds the model.</br>
+
+The effect of non-linearity on the regression model would lead to inconsistence or biased esitmates.In the presence of non-linearity we can improve the model by trying to fit the data using various polynomials or splines. Depending on the data, these two methods may provide similar fits.
+</br>
+
+#### 2. Check the random/i.i.d. sample assumption by carefully reading the data description and computing the Durbin Watson test (state the hypothesis of the test, the test statistic and p-value and the conclusion in the context of the problem). What are the two common violations of the random/i.i.d. sample assumption? What eﬀect would dependant samples have on the regression model and how might you correct or improve the model in the presence of dependant samples?
+
+```{r dwt}
+dwt(Rmodelnew)
+```
+
+The Hypothesis for this test is,
+Null Hypothesis: No autocorrelation rho=0
+</br>
+Alternate Hypothesis: rho!=0
+</br>
+From the Durbin Watson Test, the D-W Statistic value is 1.51 and its p-value is 0.006. This p-value is less than 0.005 which results in rejecting the hypothesis of No autocorrelation and confirms that observations cannot be classified as independent.
+</br>
+Dwt result shows 0.231 as autocorrelation.So, rejection of Null Hypothesis can be due to outliers. So, the outliers have to be removed for a better model and hypothesis should be checked again.
+
+The two common violations of the random/i.i.d. sample assumption can be </br>
+-Observations are separated to various groups </br>
+-Repeated Measures </br>
+
+The effect of dependant samples can be Heteroskedasticity,Outlier from different group can lead to biased result.
+</br>
+The model can be improved using Time series Analysis,Mixed Effect Models.
+
+</br>
+
+#### 3. Check the collinearity assumption by interpreting the correlation and variance inﬂation factors. What eﬀect would multicollinearity have on the regression model and how might you correct or improve the model in the presence of multicollinearity.
+
+```{r vif}
+vif(Rmodelnew)
+```
+
+The Variance Inflation Factor tests the multicollinearity in the model.its has the values that are approximately 1.So, there is no correlation between the predictor variables ie no Multicollinearity in the model.
+
+Presence of Multicollinerity can result in coefficients estimates to be unstable and difficult to interpret the model.
+
+The model with multicollinerity can be improved by </br>
+-Using Partial Least Squares Regression(PLS),Principal Components Analysis,regression methods that seperates the number of predictors to small set of uncorrelated components.
+</br>
+-Removing highly correlated predictors from the model.
+</br>
+
+#### 4. Check the zero conditional mean and homoscedasticity assumption by interpreting the studentized residuals vrs ﬁtted values plots and the studentized residuals vrs predictor variable plots. What eﬀect would heteroscedasticity have on the regression model and how might you correct or improve the model in the presence of heteroscedasticity.
+
+```{r Diagnostics4}
+plot(fitted(Rmodelnew),rstudent(Rmodelnew))
+abline(h=0)
+par(mfrow=c(1,2))
+plot(housedata$Size,rstudent(Rmodelnew))
+plot(housedata$Lot,rstudent(Rmodelnew))
+```
+
+The plot of fitted model values and studentized residuals suggests that the values are uncorrelated as they should be in a homoscedastic linear model. The second plot shows that there is no funnel shapped pattern with the values. So, the model holds the assumptions on zero conditional mean and homoscedasticity.
+
+Effects of heteroscedasticity are </br>
+-Predictions are no longer efficient </br>
+-The T-test and F-test are not valid due to inconsistency in coefficients. </br>
+
+Heteroscedasticity can be corrected using Weighted Least Squares method.
+</br>
+
+#### 5. Check the Normality assumption by interpreting the histogram and quantilequantile plot of the studentized residuals. What eﬀect would non-normality have on the regression model and how might you correct or improve the model in the presence of non-normality.
+
+```{r Normality}
+hist(rstudent(Rmodelnew),breaks = 10)
+qqnorm(rstudent(Rmodelnew))
+qqline(rstudent(Rmodelnew),col=2)
+```
+
+The plots suggests that the values are normally distributed from the approximately straight line. Hence the model holds Normality assumption.
+The effect of Non-normality is that the critical values of F-test and T-test may be misleading.To correct Non-Normality, the data can be transformed and tested again.
+
+## Leverage, Inﬂuence and Outliers:
+
+#### 1. What is a leverage point? What eﬀect would a leverage point have on the regression model? Use the leverage values and the leverage plots to see if there is any leverage points.
+
+The Leverage point is a measure of how far an observation(X-value) on the predictor variable from the mean of the predictor variable.This value can affect the summary of the model such as the R-squared value but has less impact on the estimates of the coefficients.The higher the leverage point of an observation, the more potential it has to impact the fitted model.
+
+```{r lvpoint}
+leveragepoints<-as.numeric(which(hatvalues(Rmodelnew)>((2*20)/length(housedata$Price))))
+leveragePlots(Rmodelnew)
+leveragepoints
+```
+
+The leverage points mentioned in the plots are,
+</br>
+Size: 20,25,30,36
+</br>
+Lot: 25,30,41,76
+</br>
+Bath: 25,30,37,52
+</br>
+Bed: 4,25,30,37
+</br>
+Garage: 4,25,30,37
+</br>
+School:1,3,25,30
+</br>
+
+#### 2. What is an inﬂuential point? What eﬀect would an inﬂuential point have on the regression model? Use the inﬂuence plot to see if there is any inﬂuence points.
+
+An influential point is an outlier(Y-value) that greatly impacts the slope of the regression line. 
+```{r influentialpts}
+influencePlot(Rmodelnew)
+```
+
+The influential points for this model are 4,25,35,47,74.
+</br>
+
+#### 3. What is an outlier? What eﬀect would an outlier have on the regression model? How would you correct for outliers? Use the outlier test and outlier and leverage diagnostics plot to see if there is any outliers. Deal with the outliers if any are identiﬁed.
+
+An outlier in regression model are the observations that fall far from the values of a fitted model.Outliers have a strong effect on the least squares line.This will lead to poor fitting of the regression model.
+Best method of correcting the outliers is to remove the obervations and refit the  model again.
+
+```{r outliers}
+outlierTest(Rmodelnew)
+housedata[74,]
+sturesidual=rstudent(Rmodelnew)
+sturesidual[74]
+plot(sturesidual,ylim = c(-4,4))
+abline(h=3,col="red")
+abline(h=-3,col="red")
+text(sturesidual,labels = names(sturesidual),pos=4)
+```
+
+```{r outlier1}
+
+library(olsrr)
+ols_plot_resid_lev(Rmodelnew)
+ols_plot_cooksd_bar(Rmodelnew)
+```
+From the outlier test, there are four outliers in the data. They are 2,25,30,74. These values are removed and model is refitted.
+
+```{r removingoutliers}
+housedatanew<-housedata[-c(2,25,30,74),]
+Rmodelnew1<- lm(Price~Size+Lot+Bath+Bed+Garage+School,data=housedatanew)
+summary(Rmodelnew1)
+```
+
+After removing the outliers, the Adjusted R-squared value increased from 0.51 to 0.54 ie to approximately 54%. So this is the best model and model summary is increased.
+</br>
+
+## Expected Value, CI and PI:
+
+#### 1. Plot the observed house prices, their expected vale (ﬁtted value), conﬁdence intervals (in red) and prediction intervals (in blue). Looking at this plot is this model providing a good estimate of the house prices.
+
+```{r}
+pred<-predict(Rmodelnew1,interval="predict")
+colnames(pred)<-c('p_fit','p_lwr','p_upr')
+conf<-predict(Rmodelnew1,interval="confidence")
+colnames(conf)<-c('c_fit','c_lwr','c_upr')
+new_data<-cbind(housedatanew,pred,conf)
+new_data<-new_data[order(new_data$p_fit),]
+plot(c(new_data$p_fit),c(new_data$Price),xlab = "Fitted Price Value", ylab = "Observed House Price")
+lines(c(new_data$p_fit),c(new_data$p_lwr),col="blue")
+lines(c(new_data$p_fit),c(new_data$p_upr),col="blue")
+lines(c(new_data$p_fit),c(new_data$c_lwr),col="red")
+lines(c(new_data$p_fit),c(new_data$c_upr),col="red")
+
+```
+
+The generated plot proves that the predicted model provides a good estimate of the response variable Price. 
