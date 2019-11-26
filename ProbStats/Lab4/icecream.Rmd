@@ -1,0 +1,74 @@
+---
+title: "Probability R Assignment 4"
+author: "Harshad Kumar Elangovan - 19200349"
+date: "25/11/2019"
+output: html_document
+---
+
+## Importing Icecream Data
+
+```{r importing}
+icecreamdata<-read.table("C:\\Users\\harshie\\Documents\\UCD\\Probability\\Lab4\\icecream.txt",header=TRUE)
+```
+## Part A:
+
+Plotting the sales ~ temperature for the given data:
+```{r plottingtempSales}
+plot(icecreamdata$temperature,icecreamdata$sales, main = "Sales VS Temperature",xlab = "Temperature", 
+     ylab = "Sales")
+```
+
+### What sort of relationship exists between distance and damage?
+
+The temperature and sales and linearly dependent in this model. So, as the temperature increases, the sales of increases also increases.
+
+
+## Part B
+
+```{r cor}
+cor(icecreamdata$temperature,icecreamdata$sales)
+```
+
+### What is the value of the correlation coefficient?
+
+
+The value of the correlation coefficient is 0.9722422.
+
+## Part 3
+
+```{r lsfit}
+lsfit(icecreamdata$temperature,icecreamdata$sales)
+```
+
+The equation of the regression model is
+
+Icecream_Sales = Beta0 + Beta1*Temperature;
+
+Icecream_Sales = 5.5689655 + 0.7586207*Temperture;
+
+
+we can predict the sales of icecream when the temperature is 42, by solving the equation with its value,
+
+```{r temp}
+sales<-5.5689655 + 0.7586207*42
+```
+
+## Part D
+
+Plotting the regression line in 'red' can be done using the below code,
+
+```{r plotting}
+plot(icecreamdata$temperature,icecreamdata$sales,main="Sales VS Temperature",
+     xlab = "Temperature",ylab = "Sales")
+abline(lsfit(icecreamdata$temperature,icecreamdata$sales)$coefficients,
+       col="blue")
+```
+
+For changing the regression line color,
+
+```{r plottingred}
+plot(icecreamdata$temperature,icecreamdata$sales,main="Sales VS Temperature",
+     xlab = "Temperature",ylab = "Sales")
+abline(lsfit(icecreamdata$temperature,icecreamdata$sales)$coefficients,
+       col="red")
+```

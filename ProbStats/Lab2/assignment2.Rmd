@@ -1,0 +1,71 @@
+---
+title: "Assignment 2"
+author: "Harshad Kumar Elangovan - 19200349"
+date: "15/10/2019"
+output: html_document
+---
+The data frame of two dice are created using the below code. These values are then used for calculating the probability of getting the counts of green and red dice.
+
+```{r}
+green = c(1:6,1:6,1:6,1:6,1:6,1:6)
+red = sort(green,decreasing = FALSE)
+dice = data.frame(red,green)
+dice$sum = dice$red + dice$green
+print(dice)
+```
+
+<br>
+<br>
+
+## Part A
+### What is the probability of getting a total of 8 when you roll two dice?
+
+```{r}
+counts= table(dice$sum)
+counts = data.frame(counts)
+
+counts$prob = counts$Freq / 36
+print(counts)
+```
+ 
+From the calculation above, we see that the probability of getting a total of 8 is **0.13888889**.
+
+### What is the probability of getting an even number when you roll two dice?
+
+From the data frame, we see that there are five values that are even. So taking a sum of the probabilities of those even numbers, we get **0.5** (i.e) 50 percentage of the probability.
+
+## Part 2
+
+The sample of 50 values is taken using the dice data frame and relative frequency of these sample is computed. 
+
+![](C:\Users\harshie\Documents\UCD\Probability\Lab2\sample50.JPG)
+ 
+
+### In your sample of 50, what proportion of the time did you get a total of 8?
+
+**0.14** is the proportion of the time I got a total of 8 in the given dataset.
+
+### What proportion of the time did you get an even numebr?
+The sample produced **0.36** proportion of times on even number.
+
+## Part C
+
+### In your sample of 500, what proportion of the time did you get a total of 8?
+
+![](C:\Users\harshie\Documents\UCD\Probability\Lab2\sample500.JPG)
+
+The sample produced **0.162** proportion of times for a total of 8.
+
+### What code did you use to find this?
+```{r}
+sample500 = sample(dice$sum, 500,replace=TRUE)
+prob500_table=table(sample500)
+prob500 = data.frame(prob500_table)
+prob500$relfreq = prob500$Freq/500
+```
+### Compare the proportion of times you got an 8 in each sample with the true probability of getting an 8. What do you notice?
+
+The true probability of getting an 8 is 0.13888889. For sample of 50 values, I got 0.14 as proportion and for 500 sample values, the proportion is 0.162. From this we see that the proportion increases compared with the actual probability of 8. This is because of increase in count of 8 in sample 50(8 - 7 times in the dataset) and in sample 500(8 - 81 times in the dataset). So, the proportion of times of 8 in each sample increases with increase in sample values : 0.162(sample500)/0.14(sample50)/0.13888889(true probability). 
+
+
+

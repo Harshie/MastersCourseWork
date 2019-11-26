@@ -1,0 +1,133 @@
+---
+title: "Probability and Statistics Assignment 1"
+author: "Harshad Kumar Elangovan - 19200349"
+date: "01/10/2019"
+output: html_document
+---
+<br/>
+<br/>
+The table with exam marks of each student is created using the below commands.
+```{r}
+studentname=c("John","Anne","Terry","Fred","Maria")
+exam1=c(92,75,98,62,79)
+exam2=c(82,96,60,55,72)
+results=data.frame(studentname,exam1,exam2)
+print(results)
+```
+
+### <u>Part A</u> 
+#### What code creates the list of exam2 marks?
+
+The code for creating the list of exam2 marks is
+
+```{r}
+exam2=c(82,96,60,55,72)
+```
+<br/>
+<br/>
+
+### <u>Part B</u>
+#### Who has a better grade, Maria or Terry?
+
+From the table, we can see that Maria and Terry have the same grade 'B'. But the average of Terry is more than that of Maria. So, **Terry has better grade than Maria**.
+
+```{r}
+results$avg = ((results$exam1 + results$exam2)/2)
+results$grade = cut(results$avg, breaks = c(0,49,69,84,100),labels=c("D","C","B","A"))
+results = results[order(-results$avg),]
+print(results)
+```
+
+### <u>Part C</u>
+#### Suppose you wanted to print out only the names and exam 1 marks of the students. What code would you type?
+
+We can display the names and exam 1 of the students separately by creating another dataframe with only those two columns in it. This can be done using the below code,
+
+```{r}
+results1 = data.frame(results$studentname,results$exam1)
+print(results1)
+```
+
+### <u>Part D</u>
+#### Mention the mean and median of Pulse1 and Pulse2 and which do you think is pulse after exercise?
+
+```{r}
+pulse = read.table("C:\\Users\\harshie\\Documents\\UCD\\Probability\\Lab1\\pulse.txt", header=TRUE)
+pulse = data.frame(pulse)
+```
+
+```{r}
+summary(pulse$pulse1)
+summary(pulse$pulse2)
+```
+
+From the above table, the mean and median of both the pulses are as follows,
+
+<u>Pulse1</u>
+
+Mean:72.87
+
+Median:71.00
+<br/>
+<br/>
+
+<u>Pulse2</u>
+
+Mean:80
+
+Median:76
+
+The pulse 2 with mean and median value higher is the pulse after exercise.
+
+### <u>Part E</u>
+#### Mention the mean and median of Ran = 1 and Ran = 2 and Which group do you think ran and which walked?
+
+The mean and median of the pulses with Ran value 1 and 2 can be found using the below mentioned function in markdown. This will produce the output based on the conditions.
+
+```{r}
+summary(pulse$pulse2[pulse$ran ==1])
+summary(pulse$pulse2[pulse$ran ==2])
+```
+From the above table, the mean and median of both the pulses are as follows,
+
+<u>Ran = 1</u>
+
+Mean:92.51
+
+Median:88.00
+<br/>
+<br/>
+
+<u>Ran = 2</u>
+
+Mean:72.32
+
+Median:70.00
+
+So, from the above mean and median values, the pulse with Ran =1 ran while exercising and pulse with Ran=2 walked.
+
+### <u>Part F</u>
+#### What is the most common (modal) pulse1 measurement?
+
+From the output below, the most common measurement in pulse1 is 68.
+
+```{r}
+table(pulse$pulse1)
+```
+
+#### What is the most common (modal) pulse2 measurement?
+
+From the output below, the most common measurement in pulse2 is 76.
+
+```{r}
+table(pulse$pulse2)
+```
+
+### <u>Part G</u>
+#### Sketch the histogram of the weights of female volunteers here:
+
+The code for producing the histogram of the weights of female volunteers is as follows,
+
+```{r}
+hist(pulse$weight[pulse$sex==2],xlab="Weight",main="Histogram of Female Volunteers based on weight")
+```
