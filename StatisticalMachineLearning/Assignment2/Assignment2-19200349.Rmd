@@ -1,0 +1,181 @@
+---
+title: "SML - Assignment 2"
+author: "Harshad Kumar Elangovan - 19200349"
+date: "02/04/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The dataset "spam" is an extract of the contents of emails which were classified as spam and non spam emails. It has a total of 58 columns in which first 48 contain the frequency of the variable name in the email.The columns 49-54 indicate the frequency of the special characters & 55-57 contain the average, longest and total run-length of capital letters. The last column "type" indicates if an email
+is spam or nonspam.This last column "type" is the target response variable while fitting the Logistic Regression model to the data.
+
+```{r dataload}
+library(kernlab)
+data(spam)
+emaildata<-data.frame(spam)
+```
+
+This emaildata data frame contains all the variables of the spam dataset. For fitting the regression, we have to subset the dataset based on the frequencies of special characters. So, emaildata is updated and the variable "type" is updated from "spam" or "nonspam" to 0 or 1 for further usage of the dataset in the model.
+
+```{r updatedata,message=FALSE,warning=FALSE}
+
+emaildata1<- emaildata[,49:58]
+
+#Converting the factors to 0's and 1's
+library(dplyr)
+emaildata1$type<-recode(emaildata1$type,'spam'=1,'nonspam'=0)
+str(emaildata1)
+```
+
+</br>
+</br>
+</br>
+</br>
+</br>
+
+#### Fitting the Logistic Regression Model
+
+The updated dataset emaildata1 is then used for fitting the model. This can be done using glm command.
+
+```{r fittingmodel,message=FALSE,warning=FALSE}
+#Fitting the model
+fit<-glm(emaildata1$type ~.,data = emaildata1,family = "binomial")
+summary(fit)
+```
+
+<b>From the summary, we can see that the 'charDollar' & 'charExclamation' significantly affect the  probability of an email being spam. These two variables are highly significant with p value less than 0.05</b>.
+
+We will have to estimate the log-odds for checking the inferential problems related to these variables.
+
+We can construct the Confidence Intervals for the estimated coefficients to verify the odds are in range and also check the confidence intervals of each coefficients.
+
+```{r CI}
+#Confidence Intervals and log-odds
+# Extracting the coefficients
+w <-coef(fit)
+
+
+#Computing 95% confidence interval of w and odds
+#extracting Standard Errors
+summaryfit<-summary(fit)
+se<-summaryfit$coef[,2]
+
+# compute confidence limits for w
+wLowBound   <- w - 1.96 * se
+wUpperBound <- w + 1.96 * se
+
+# store coefficients and confidence limits
+ci<- cbind(lb =wLowBound,w =w,ub =wUpperBound)
+#ci
+
+#confidence Intervals for odds
+exp(ci)
+```
+
+For estimating the log-odds, we will make use of 'predict' function in fit data. This estimate is then used for plotting the data.
+
+```{r estimatelogodds}
+#Estimated log-odds
+lg<-predict(fit)
+phat<-predict(fit,type="response")
+
+
+#Plotting
+symb<-c(19,17)
+col<-c("darkorange2","deepskyblue3")
+#jitter is used for adding noise for better visualization of the data.
+plot(lg,jitter(phat,amount = 0.1),pch=symb[emaildata1$type +1],
+     col = adjustcolor(col[emaildata1$type +1],0.7),cex = 0.7,
+     xlab = "Log-odds",ylab="Fitted Probabilities")
+
+```
+
+There is a steep increase in the curve at x=0. This might be due to 'w' value close to infinity. his type of data lead to the problem of <b> complete separation </b> in logistic regression.This regresssion tries to fit a sigmoid curve to the data. But the coefficient 'w' is increased to infinity value and it becomes difficult to calculate the slope for the curve. This shows that <b> the model is fitted so good that it cannot be inferred with those variables</b>.
+
+<b> Firth Logistic Regression or Regularized Logistic Regression </b> can be used in solving this inferential problem.
+
+
+
+####  Evaluate the general classification accuracy of the model using the ROC curve and calculate an optimal threshold τ for prediction.
+
+
+
+The Receiver Operating Characteristic(ROC) curve illustrates the diagnostic ability of a binary classifier as the discrimination threshold tau is varied. The estimated probabilities can be calculated uing a threshold tau. We set a default value of this threshold to 0.5.
+
+```{r tau}
+
+#Evaluating the classification using a default threshold value
+tau<-0.5
+pred<-ifelse(fitted(fit)>tau,1,0)
+
+#cross tabulation between observed and predicted
+table(emaildata1$type,pred)
+```
+
+we observe that 2645 records were correctly classified as nonspam and 1209 records were correctly identified as spam.Rest of the records are incorrectly classified. So we will use ROCR package for assessing the predictive performance for different values of discrimination threshold.
+
+```{r ROCR,message=FALSE,warning=FALSE}
+#ROCR
+library(ROCR)
+
+#Prediction object is created using prediction function
+predObj<-prediction(fitted(fit),emaildata1$type)
+
+#The performance measures are calculated using the prediction object with True and False positive rate. This is then used for plotting the ROC curve.
+perf<-performance(predObj,"tpr","fpr")
+plot(perf)
+abline(0,1,col="darkorange2",lty=2)
+
+
+#The area under the curve is also calculated using the performance function.
+auc<-performance(predObj,"auc")
+auc@y.values
+
+```
+
+So,this classification of graph was done with a default threshold value 0.5.  This classification can be improved using an optimal threshold value. This can be done by maximizing the sum of sensitivity and specificity for different threshold values.
+
+```{r optimalthreshold}
+
+#Sensitivity and Specificity calculation for optimal threshold value
+sens<-performance(predObj,"sens")
+spec<-performance(predObj,"spec")
+
+tau<-sens@x.values[[1]]
+
+#Sum of Sensitivity and Specificity
+sensSpec<-sens@y.values[[1]] + spec@y.values[[1]]
+
+#Finding the maximum of Sum of Sensitivity and Specificity
+best<-which.max(sensSpec)
+
+#
+plot(tau,sensSpec,type="l",xlab="Threshold values",ylab="Sum of Sensitivity and Specificity")
+points(tau[best],sensSpec[best],pch=19,col=adjustcolor("darkorange2",0.5))
+abline(v=tau[best],col="darkorange2",lty=2)
+```
+
+From this plot, we can find the optimal threshold value,pointed in orange color, based on the values of Sensitivity and Specificity.
+
+</br>
+</br>
+</br>
+</br>
+</br>
+</br>
+
+The Optimal threshold and its classification is given by
+
+```{r OptimalClassification}
+
+tau[best]
+
+#Classification for optimal threshold
+pred<-ifelse(fitted(fit)>tau[best],1,0)
+table(emaildata1$type,pred)
+```
+
+From the above performance measures, the optimal threshold τ for prediction is calculated as 0.3432798 and from the Classification using this optimal threshold,we observe that 2488 records were correctly classified as nonspam and 1425 were correctly classified as spam. This optimal classification is better than the classification that was calculated with threshold value 0.5.
