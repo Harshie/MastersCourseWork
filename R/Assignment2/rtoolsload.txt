@@ -1,0 +1,3 @@
+writeLines('PATH="${C:\\Program Files\\R}\\usr\\bin;${PATH}"', con = "~/.Renviron")
+
+untar("climr_0.1.1.tar.gz")

@@ -1,0 +1,494 @@
+---
+title: "Adv Data Prog with R_Final Project STAT40830_19200324"
+author: "GUL RUKH AHMAD"
+date: "16/08/2020"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Question 1**
+
+The dataset is loaded as tibble with the help of rio library.
+
+Also Columns 1, 16, 17, 18 and 25 are loaded as characters
+
+Columns 2 and 14 are converted to factors
+
+Column 15 is loaded as integers and rest other columns are doubles.
+
+There is 3659 records loaded in exo dataset
+
+```{r}
+set.seed(19200324) # Setting seed
+
+#install.packages("rio")
+library(rio) # rio package is installed and library rio is called which helps in importing file directly as tibble
+exo <- import("exo_data.csv", setclass = "tibble")
+library(dplyr)
+library(magrittr)
+# Converting the two variables flag (Column2) and meth (Column14) as factors
+exo<-exo %>% mutate(flag=factor(flag)) %>% mutate(meth=factor(meth))
+head(exo) # Checking first few records from the top
+glimpse(exo) # Checking every column in the tibble
+```
+
+**Question 2 **
+
+Unknown method of discovery is removed.
+
+We have 3596 records in exo1 dataset.
+
+```{r}
+
+# Checking the levels of method of discovery (meth) column
+# It has six levels imaging, microlensing, RV, timing, transit and a blank level
+levels(exo$meth)
+# We need to remove all the records associated with blank level for  method of discovery.
+# In other words we need to keep only five known levels(known method of discovery) and omit unknown method of discovery
+# We have filtered records having these five levels and dropped the unused blank level as well.
+# New dataset exo1 is created 
+exo1<-exo %>% filter(meth=='imaging'| meth=='microlensing' | meth=='RV'| meth=='timing' | meth=='transit') %>%droplevels(exo$meth)
+                  
+# Checking the levels of meth column in exo1 dataset which is as per requirement (the five known method of discovery)
+levels(exo1$meth)
+glimpse(exo1)
+```
+
+**Question3 **
+
+We have to show the relationship between log-distances from the sun and method of discovery.
+
+Log-distances from the sun is continuous variable and method of discovery is discrete categorical variable.
+
+We will draw box-plot in such case to show the relationship.
+
+Observation from Box Plot-:
+
+1. There are no outliers for imaging method of discovery. Rest other methods of discovery has outliers
+
+2. Microlensing and RV methods of discovery are normally distributed.
+
+3. Imaging method of discovery is left-skewed (negatively skewed)
+
+4. Timing and Transit method of discovery is slightly right-skewed (positively skewed)
+
+
+```{r}
+
+# Box plot is drawn to show the relationship
+
+library(ggplot2)
+r <- ggplot(data = exo1, aes(x=meth,y=log(dist),fill=meth))+
+  geom_boxplot(na.rm=TRUE)
+r+
+  labs(
+    title = "Box plot for relationship between log-distance from Sun and method of discovery",
+    x = 'method of discovery',
+    y = 'log of distance from sun'
+    
+  )
+```
+
+
+
+**Question 4**
+
+Scatter plot as per the given requirement is drawn between log mass and log distances separated by method of discovery
+
+In fact we have drawn two plots for this-:
+
+One plot has all the records of scatter plot in a single grid separated by different colors for method of discovery
+
+For Other plot we have just added facet_wrap to make the plots in different grid having different color representation
+for the  methods of discovery
+
+
+
+```{r}
+
+# Facet_wrap is used here
+#install.packages("ggiraph")
+library(ggiraph)
+library(viridis)
+# onclick column is added in exo1 dataset with values as such which will meet the requirement of 
+# exoplanet's page being opened when cursor is clicked on the scatterplot 
+exo1$onclick <- sprintf("window.open(\"%s%s\")",
+                        "http://www.openexoplanetcatalogue.com/planet/",
+                        exo1$id)
+p<-ggplot(exo1, aes(x = log(dist), y = log(mass), colour = meth))+
+  
+  xlab('log of Mass')+
+  ylab('log of Distance')+
+  ggtitle('Scatter Plot for log mass versus log distance')+
+  
+  scale_color_discrete(name="Methods of Discovery")+ facet_wrap(~meth) + theme_light()
+p1 <- p + geom_point_interactive(aes(tooltip = id,
+                                     data_id = id,onclick = onclick),
+                                 size = 2,na.rm=TRUE)
+ggiraph(code = print(p1), width = 0.9)
+
+
+# Facet_wrap is not used here
+q<-ggplot(exo1, aes(x = log(dist), y = log(mass), colour = meth))+
+  
+  xlab('log of Mass')+
+  ylab('log of Distance')+
+  ggtitle('Scatter Plot for log mass versus log distance')+
+  
+  scale_color_discrete(name="Methods of Discovery")+ theme_light()
+q1 <- q + geom_point_interactive(aes(tooltip = id,
+                                     data_id = id,onclick = onclick),
+                                 size = 2,na.rm=TRUE)
+ggiraph(code = print(q1), width = 0.9)
+
+```
+
+
+**Question 5**
+
+We have renamed radius column to jupiter_radius and created new column earth_radius which is 11.2 times the 
+jupiter_radius
+
+
+```{r}
+
+# radius is renamed to jupiter radius and new column earth radius is created which is 11.2 times the jupiter radius
+exo1<-exo1 %>% rename(jupiter_radius=radius) %>% mutate (earth_radius=11.2*jupiter_radius)
+glimpse(exo1) # checking all the columns of dataset now
+
+```
+
+**Question 6**
+
+There are 2732 records in exo2 dataset after exclusion of missing values from log-earth radius and log -period column
+
+After kmeans is performed we get following number of records in each cluster-:
+
+Cluster1 = 441
+Cluster2 = 751
+Cluster3 = 384
+Cluster4 = 1156
+
+
+```{r}
+# Keeping only those rows in exo2 dataset where log-earth radius and log-period has no missing values
+exo2<-exo1 %>% filter(!is.na(log(earth_radius)) & !is.na(log(period)) )
+glimpse(exo2)
+# In exo3 dataset we are keeping only earth radius and period variable on which kmeans is to performed 
+exo3<-exo2 %>%  select(earth_radius,period)
+# Performing kmeans on log-earth radius and log-period with four clusters
+k_cluster<-kmeans(log(exo3),centers = 4)
+# Records in each cluster is found out after kmeans is executed
+k_cluster$size
+
+```
+
+**Question 7**
+
+Cluster 1 having 441 records is assigned cold_gas_giants clustering label
+Cluster 2 having 751 records is assigned others clustering label
+Cluster 3 having 384 records is assigned hot_jupiters clustering label
+Cluster 4 having 1156 records is assigned rocky clustering label
+
+The clustering label is assigned based on visualization of plot given in the link in the question.
+
+These all new clustering label is incorporated in newly created type variable in the exo2 dataset
+
+Finally we have drawn scatter plot for log-earth radius vs log-period highlighting these clusters.
+
+
+```{r}
+
+type<-k_cluster$cluster # type variable is created which is having the clusters found
+#install.packages("tidyverse")
+library(tidyverse)
+exo2<-exo2 %>% mutate(type=factor(type)) # Adding type variable to exo2 dataset and converting it to factor
+# Re-coding the labels of type variable. The clustering label is applied based on visualizing the plot as given in the # https://en.wikipedia.org/wiki/Exoplanet#/media/File:ExoplanetPopulations-20170616.png plot 
+exo2<- exo2 %>% mutate(type = recode(type, "1"="cold_gas_giants", "2"="others", "3"="hot_jupiters", "4"="rocky"))
+
+levels(exo2$type) # Checking the clustering labels
+table(exo2$type) # Checking whether each clustering label has correct number of records as per our visual representation of plot given
+
+#Required Scatter plot is drawn highlighting the four clusters
+ggplot(data=exo2, aes(x=log(period), y=log(earth_radius), color=type )) + 
+  geom_point() +
+  xlab('log of Period')+
+  ylab('log of Earth_Radius')+
+  ggtitle('Scatter plot of log of Period vs log of earth radius highlighting four clusters')
+
+# Note-: with the help of "stat_ellipse" we can highlight this cluster much better way as well
+# Stat ellipse is the extra line of code added here
+t<-ggplot(data=exo2, aes(x=log(period), y=log(earth_radius), color=type )) + 
+  geom_point() +
+  stat_ellipse(type = "t",geom = "polygon",alpha = 0.4)+
+  xlab('log of Period')+
+  ylab('log of Earth_Radius')+
+  ggtitle('Scatter plot  highlighting four clusters with stat_ellipse')
+t
+
+```
+
+
+**Question 8**
+
+Violin plot is drawn to illustrate the relationship between log-mass (continuous variable) and type (discrete categorical variable)
+
+Observations from violin plot-:
+
+1. There are no outliers for cold_gas_giants type. Rest other types have outliers
+
+2. Rocky is having normally distributed data
+
+3. cold_gas_giants and hot_jupiters data are  slightly left skewed (negatively skewed)
+
+4. Others type data are slightly right skewed (positively skewed)
+
+
+```{r}
+
+n <- ggplot(data = exo2, aes(x=type,y=log(mass),fill=type))+
+  geom_violin(na.rm=TRUE)
+n+
+  labs(
+    title = "Violin plot for relationship between log-mass vs cluster type",
+    x = 'cluster type',
+    y = 'log of mass'
+    
+  )
+
+```
+
+
+**Question 9**
+
+lubridate is used which makes it easier to work with date and time
+
+r_asc values are converted to seconds and the new value is kept in  newly created variable r_asc_seconds
+decl values are converted to seconds and the new value is kept in newly created decl_seconds variable
+
+Note-: There are no records under microlensing and timing method in exo2 (having 2732 observations) dataset.
+Hence while drawing the celestial map (scatter plot ) of exoplanets ; these methods having no records are not shown
+
+```{r}
+
+library(lubridate) # lubricate is called which makes it easier to work with dates and times
+
+# Converting values in r_asc to seconds and putting them in new variable r_asc_seconds
+exo2<-exo2 %>% mutate(r_asc=str_replace_all(r_asc," ",":")) %>% mutate(r_asc=hms(r_asc)) %>% mutate (r_asc_seconds=period_to_seconds(r_asc))
+
+
+# Converting values in decl to seconds and putting them in new variable decl_seconds
+exo2<-exo2 %>% mutate(decl=str_replace_all(decl," ",":")) %>% mutate(decl=hms(decl)) %>% mutate (decl_seconds=period_to_seconds(decl))
+
+# Checking total number of records in meth column for each methods in exo2 dataset.
+# We observe that there are no records under microlensing and timing method 
+table(exo2$meth)
+
+# Celestial map for the exoplanets drawn- Scatter plot is drawn for same
+# Note-: Since there are no records under microlensing and timing method; these are not shown in the plot
+a<-ggplot(exo2, aes(x = r_asc_seconds, y = decl_seconds, colour = meth))+
+  geom_point(na.rm=TRUE)
+a+
+  labs(
+    title = "Celestial map for the exoplanets",
+    x = 'Right ascension in seconds',
+    y = 'Declination in seconds'
+    
+  ) 
+```
+
+
+**Question 10**
+
+We have used exo1 dataset from question2 having 3596 records for this question
+
+exo1_new dataset is created where method and year is grouped and we have the count of each method for that year as well as cumulative count of method also available.
+
+exo1_new dataset has NA values which resulted in error while drawing animated time series graph. Hence removed the NA values records from the dataset
+The error thrown was-:
+Error in sprintf(paste0("%0", nc, "i"), frame) : 
+  invalid format '%0NA'; use format %f, %e, %g or %a for numeric objects
+  
+  
+Finally animated time series is plotted illustrating the evolution over time of the total number of exoplanets discovered for each method up to that year
+
+Note-: we have drawn animated times series with facet_wrap included where the plots of each method of discovery is in different grid. We can plot the same animated time series without facet_wrap as well.
+
+
+```{r}
+# We have used exo1 dataset from question2 having 3596 records for this question
+
+# exo1_new dataset is created  where method and year is grouped and we having the count of each method for that year and cumulative count of method is also available.
+exo1_new <- exo1 %>% group_by(meth, year) %>%  summarise(method_count = length(meth)) %>%
+  mutate(method_count = cumsum(method_count))
+# Checking the dataset exo1_new for any NA values 
+View(exo1_new)
+# Note-: Animated time series when attempted to create with NA values thrown error hence omitting records with NA values
+exo1_new <- na.omit(exo1_new)
+library(gganimate)
+library(gifski)
+
+# Animated time series is plotted 
+anim <- ggplot(exo1_new, aes(x = year, y = method_count,color=meth)) +
+  geom_line(aes(group = meth)) +
+  geom_point(aes(group = seq_along(year),size=1)) + 
+  facet_wrap(~meth)+
+  transition_reveal(year) +
+  labs(title='evolution over time total number of exoplanets discovered for each method',xlab='year',ylab='method_count')+
+  enter_fade() +
+  exit_fade()
+
+animation <- animate(anim, renderer = gifski_renderer(loop = T))
+animation
+
+```
+
+
+```{r ,message=FALSE,warning=FALSE}
+
+library(shiny)
+
+ui <- shinyUI(
+    fluidPage(
+      # Title of Application
+    titlePanel("Discovery of Exoplanet"),
+
+    
+    sidebarLayout(
+        sidebarPanel(
+            sliderInput("year",
+                        "Yearwise Discovery of Exoplanets:",
+                        min = 2009,
+                        max = 2018,
+                        value = 2015),
+            
+            selectInput("type",
+                        label = "Type of Exoplanets Discovered:",
+                        choices = c('rocky', 'hot_jupiters', 'cold_gas_giants', 'others','All'),
+                        selected = 'rocky')
+        ),
+
+       
+        mainPanel(
+           plotOutput("ScatterPlot")
+        )
+    )
+  )
+)
+
+server <- function(input, output) {
+    output$ScatterPlot <- renderPlot({
+      
+        y <- exo2
+        y <- reactive({
+                      if(input$type == 'All'){
+                        exo2[(exo2$year <= input$year),] 
+                      }
+                      else {
+                         exo2[((exo2$year <= input$year) & (exo2$type == input$type)),] 
+                      }
+                       
+                      })
+       
+        ggplot(y(), aes(x= log(mass),y = log(dist), color = meth)) +
+          geom_point() + labs(title='Exoplanets on Scatter Plot ',xlab='log ofmass',ylab='log of distance')
+          
+    })
+}
+
+shinyApp(ui = ui, server = server)
+
+```
+
+**Question 12**
+
+Linear regression model  with the help of inbuilt lm function is applied to the data with log-period as response variable and logs of host_mass, host_temp and axis as explanatory variables
+
+Note-: Intercept is also included in the regression model
+
+```{r}
+
+# Note we are using exo2 dataset from Question 6 for our analysis here.
+# We are selecting the covariates given in the question for fitting multiple  linear regression model
+exo_covariate<-exo2 %>%  select(period, host_mass, host_temp, axis)
+exo_covariate_final <- na.omit(exo_covariate) # We are excluding those rows where there is at least one missing value
+# Taking the log of each covariate
+exo_covariate_final<- exo_covariate_final %>% mutate(period = log(period),host_mass = log(host_mass),
+                              host_temp = log(host_temp), axis = log(axis)) 
+# Fitting the Linear regression model with lm function
+regression_model<-lm(period ~ host_mass+host_temp+axis, data = exo_covariate_final)
+```
+
+
+
+**Question 13**
+
+
+Interpretation of the fitted model-:
+
+ 1. Estimated coefficient for Intercept is 7.2178453 which means that for 1 unit increase in Intercept value keeping the predictor variables host mass, host temp and axis constant; the response variable- period increases by 7.2178453 unit. There is a positive correlation between Intercept and Period
+ 
+ 2. Estimated coefficient for host mass is -0.2599925 which means that for 1 unit increase in host mass value keeping the predictor variables host temp , axis and Intercept constant; the response variable- period decreases by 0.2599925  unit. There is a negative correlation between host mass and period
+ 
+3. Estimated coefficient for host temp is -0.1578013 which means that for 1 unit increase in host temp value keeping the predictor variables host mass , axis and Intercept constant; the response variable- period decreases by 0.1578013  unit. There is a negative correlation between host temp and period
+
+4. Estimated coefficient for axis is 1.4830300 which means that for 1 unit increase in axis value keeping the predictor variables host mass , host temp and Intercept constant; the response variable- period increases by  1.4830300  unit. There is a positive correlation between axis and period
+
+5. P-value for estimated coefficient of Intercept, host_mass, host_temp and axis is less than 0.05 for all these which means that the explanatory variables host mass , host temp and axis are statistically significant at 95% Confidence Interval and they all contribute in explaining the model and all these variables helps in predicting the response variable period
+
+6. R-squared value  is 0.9795563 which means 97.95% of the model is explained by the  explanatory variables. R squared value helps in interpreting as to how well the regression model fits the observed data. High R squared means better fit and low R squared value means bad fit of model to the data.
+
+7. Adjusted R-square value is 0.9794568 which is almost equal to  R-squared value .It compares the goodness-of-fit for regression models that contain differing numbers of independent variables. Here we can conclude that the explanatory variable are doing a very good job in explaining the model
+
+8. We have also shown the 95% CI value for the estimated coefficient of Intercept, host_mass, host_temp,axis.
+
+9. With the help of ggResidpanel we have drawn plots like residual plot, qqplot etc which helps in further interpretation of the fitted regression model.
+
+From the QQ-plot we could see that it is almost normal with some outliers in the tail end
+
+From the histogram plot of residuals (studentized) vs density; we could see the density plot is also normally distributed
+
+From the residual plot of  Predicted values vs Residuals we could see that the most of  values are hovering around 0
+with some outliers. The residuals are having  symmetrical pattern and almost have a constant spread throughout the range. It is homoskedastic in nature. There is no funnel shape in residual vs predicted values graph which otherwise would have indicated non-constant variance.
+
+In the residual vs leverage plot as well there is no strong evidence for heteroskedasticity
+
+**10. Overall we can conclude that the fitted linear regression model is a good model **
+
+
+
+```{r}
+
+# Overall Summary of the fitted model
+summary(regression_model)
+
+# We can also get the summaries one by one as well
+
+regression_model$coefficients # Estimated coefficients of Intercept and predictor variable
+confint(regression_model, level=0.95) # 95 % Confidence Interval of the estimated coefficients
+
+summary(regression_model)$r.squared  # R-squared value of our model
+summary(regression_model)$adj.r.squared # Adjusted R-squared value of our model
+
+#install.packages("ggResidpanel")
+# With the help of ggResidpanel we are drawing various plots like Residual Plot, Q-Q Plot etc which helps us in analyzing the fitted values of the regression model
+library(ggResidpanel)
+resid_panel(regression_model,plots = "all")
+resid_xpanel(regression_model, yvar = "response")
+```
+
+
+
+**Question 11 and 14**
+
+We have created the Interactive shiny plot as per the question requirement and embedded the same into R-markdown
+
+
+
+
+
+

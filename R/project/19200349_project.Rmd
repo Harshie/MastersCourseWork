@@ -1,0 +1,440 @@
+---
+title: 'Exoplanets Catalogue & their methods of discovery '
+author: "Harshad Kumar Elangovan - 19200349"
+date: "11/08/2020"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The provided dataset is an Exoplanet Catalogue which has the details of all discovered extra-solar planets by NASA. It has several variables which provides the data related the discoveries, such as - name of the discovered planet or stars, period, temperature, year of discovery, method used for discovery,etc.
+
+We will use load the dataset and do the required analysis and produce the results based on that. First we would load all the required libraries.
+```{r library, warning=FALSE,message=FALSE}
+#setting up seed
+set.seed('19200349')
+
+# Loading all the required libraries
+library(readr)
+library(tibble)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(ggplot2)
+library(shiny)
+library(knitr)
+library(ggiraph)
+library(lubridate)
+library(gganimate)
+library(reshape2)
+
+```
+
+
+##### 1. Import the dataset exo_data.csv as a tibble. Columns 1, 16, 17, 18, 25 should be characters. Columns 2, 14 should be factors. Column 15 should be integers. The remaining columns should be doubles.
+
+After loading the dataset into tibble, we can see that the variables are loaded in double and character formats. So, we will update few variables as factors and use it for further analysis. 
+```{r loading, warning=FALSE,message=FALSE}
+#  the dataset is loaded as a tibble
+expodataset <- read_csv("exo_data.csv") 
+
+# Checking the format of the dataset
+str(expodataset)
+
+# printing the column names for required variables
+colnames(expodataset[,c(1,2,14,15,16,17,18,25)])
+
+# converting the required columns as factor
+expodataset$flag %<>% as.factor
+expodataset$meth %<>% as.factor
+
+
+# converting the required columns to integer
+expodataset$year %<>% as.integer
+
+# converting the required columns to character
+expodataset$id %<>% as.character
+expodataset$recency %<>% as.character
+expodataset$r_asc %<>% as.character
+expodataset$decl %<>% as.character
+expodataset$lists %<>% as.character
+
+# all other columns are already in col_double() format.
+```
+
+##### 2. Exclude the exoplanets with an unknown method of discovery
+
+We will exclude the rows of the exoplanets with an unknown method of discovery.
+
+```{r cleanmeth, warning=FALSE,message=FALSE}
+
+# We can drop rows containing missing values (unknown) of the method variable using is.na function
+
+length(expodataset$meth)
+expodataset <- expodataset[!is.na(expodataset$meth), ]
+length(expodataset$meth)
+
+# From the length difference, we see that around 63 rows are removed from the dataset.
+
+```
+
+
+##### 3. Create a graphic which illustrates the relationship between the log-distances from the Sun and the methods of discovery.
+
+We will create the graphics for illustrating the relationship between the distance of the exoplanets from sun and the methods used for the discovery. 
+```{r plotrelations, warning=FALSE,message=FALSE}
+
+# Box plot of the dataset
+ggplot(expodataset, aes(meth,log10(dist),col=meth)) +
+  geom_boxplot(na.rm = T) +
+  facet_wrap(~meth) +
+  labs(
+    title = "Plot of log-distance from Sun",
+    x = 'Methods of discovery',
+    y = 'Log-distances from the Sun') +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank()) +
+  scale_color_discrete(name = "Methods of Discovery")
+```
+
+The plot shows that relationship of methods such as imaging, microlensing, transit, etc. with the log distance of the exoplanets from the sun. The methods such as microlensing, transit, RV have a very clear relationship with distances from sun. We can check the relationships using histogram graphics aswell.
+
+```{r plothistogram, warning=FALSE,message=FALSE}
+
+# Histogram of the dataset
+ggplot(expodataset, aes(x = log(dist),col = meth)) +
+  geom_histogram(position = "identity",na.rm = T,bins = 30) +
+  facet_wrap(~meth) +
+  labs(
+    title = "Plot of log-distance from Sun",
+    x = 'Methods of discovery',
+    y = 'Frequency') + 
+   scale_color_discrete(name = "Method of Discovery") 
+
+
+```
+
+
+##### 4. Create scatterplots of the log-mass versus log-distances, separating by methods of discovery. Hovering with the cursor highlights the point and displays its name, and, if you click, the exoplanet’s page on the Open Exoplanet Catalogue will be opened. (paste the id after http://www.openexoplanetcatalogue.com/planet/ ).
+
+In this plot, each scattered points have a link which shows the details of the particular exoplanet. This is done using interactive function in ggplot.
+```{r q4, warning=FALSE,message=FALSE}
+
+expodataset$link <- sprintf("window.open(\"%s%s\")",
+                              "http://www.openexoplanetcatalogue.com/planet/",
+                              as.character(expodataset$id))
+
+g2 <- ggplot(expodataset, aes(log10(mass),log10(dist), colour = as.factor(meth))) +
+  labs(
+    title = "Exoplanets Interactive Plot",
+    x = 'Log-Masses',
+    y = 'Log-distances from the Sun') + 
+    scale_color_discrete(name="Methods of \nDiscovery") +
+    geom_point_interactive(aes(tooltip = id,
+                                      data_id = id,
+                                      onclick = link),alpha=0.5,
+                                  size = 1.5,na.rm=T)
+
+ggiraph(code = print(g2), width = 0.8,tooltip_opacity = 0.5)
+```
+
+##### 5. Rename the radius into jupiter_radius, and create a new column called earth_radius which is 11.2 times the Jupiter radius.
+
+```{r newcoln, warning=FALSE,message=FALSE}
+
+#checking the column name of the fourth variable
+colnames(expodataset[,4]) 
+
+expodataset <- expodataset %>% rename(jupiter_radius = radius)
+
+#checking the column name of the fourth variable after change
+colnames(expodataset[,4]) 
+
+expodataset <- expodataset %>% mutate(earth_radius = 11.2 * jupiter_radius)
+```
+
+##### 6. Focus only on the rows where log-earth radius and log-period have no missing values, and perform kmeans with four clusters on these two columns.
+
+The required data are saved to a new dataset which is then used for clustering the data. The model creates clusters which is stored in 'kmeansmodel'. This model is used for understanding the clusters of the exoplanets dataset provided.
+```{r clusters, warning=FALSE,message=FALSE}
+
+#Removing the null values before clustering
+expodataset1 <- expodataset %>% drop_na(earth_radius, period)
+
+# New dataset is created required for clustering
+radius_dataset <- expodataset1 %>% transmute(period = log(period),earth_radius = log(earth_radius))
+               
+#Clusters on the data is created using kmeans function with four centers.
+kmeansmodel <- kmeans(radius_dataset, centers = 4)
+
+# Table of Clusters  
+table(kmeansmodel$cluster)
+```
+
+##### 7. Add the clustering labels to the dataset through a new factor column called type, with levels rocky, hot_jupiters, cold_gas_giants, others; similarly to https: //en.wikipedia.org/wiki/Exoplanet#/media/File:ExoplanetPopulations-20170616. png and produce the scatterplot highlighting these clusters.
+
+We can use the output of the dataset for interpretting the levels of the exoplanets. The output is used for creating a new label for the exoplanets based on the clusters and a graphic representation is done. This plot shows the spread of data among the four clusters. 
+
+```{r plottingclusters, warning=FALSE,message=FALSE}
+
+# the cluster values are converted to a factor
+kmeansmodel$cluster <- as.factor(kmeansmodel$cluster)
+
+# this factor is then updated in the dataset each each exoplanets.
+expodataset1$type <- kmeansmodel$cluster
+expodataset1$type <- as.numeric(expodataset1$type)
+
+# we name each cluster based on the wikipedia link provided
+expodataset1$type[expodataset1$type == 1] <- "others"
+expodataset1$type[expodataset1$type == 2] <- "hot_jupiters"
+expodataset1$type[expodataset1$type == 3] <- "cold_gas_giants"
+expodataset1$type[expodataset1$type == 4] <- "Rocky" 
+
+# plot of the dataset
+ggplot(expodataset1, aes(log(period), log(earth_radius), color = type)) + 
+  geom_point() + 
+  xlab('Log-Period') +
+  ylab('Log-Earth Radius') +
+  labs(title="Clustering Exoplanets Radius") +
+  scale_color_discrete(name="Cluster types")
+
+# CLustering Labels
+table(expodataset1$type)
+```
+
+##### 8. Use a violin plot to illustrate how these clusters relate to the log-mass of the exoplanet.
+
+The violin plot is similar to the box plot whcih we came across in part 3. This plot describes about the median and quantiles of the cluster types of teh dataset. From this output, we see that most of the exoplanets fall under rocky type and it has the maximum count of the exoplanets.
+```{r violin plot, warning=FALSE,message=FALSE}
+
+#violin plot for the dataset
+ggplot(expodataset1, aes(x = type, y = log(mass))) + 
+      geom_violin(na.rm=TRUE) +
+  xlab('Cluster Types') +
+  ylab('Log-Mass') +
+      labs(title = "Violin plot for log-mass of the Exoplanets")
+```
+
+##### 9. Transform r_asc and decl into two new variables that are the same variables but in values of seconds. Use these as coordinates to represent a celestial map for the exoplanets.
+
+The Right ascension and declination variables contains the degrees in characters. So, it is converted to time format from character format and then converted to seconds. Once both the variables are converted to seconds, it is used for representing the celestrial map for the exoplanets.
+```{r deg2sec, warning=FALSE,message=FALSE}
+#We would remove the empty rows from the dataset
+expodataset1 <- expodataset1 %>% drop_na(r_asc,decl)
+
+# data is splitted using gsub function and then converted to time format and then converted to seconds using period_to_seconds.
+expodataset1$r_asc1 <- gsub(" ", ":", expodataset1$r_asc, fixed = TRUE)
+expodataset1$r_asc1 <- hms(expodataset1$r_asc1)
+expodataset1$r_asc1 <- period_to_seconds(expodataset1$r_asc1)
+
+# data is splitted using gsub function and then converted to time format and then converted to seconds using period_to_seconds.
+expodataset1$decl1 <- gsub(" ", ":", expodataset1$decl, fixed = TRUE)
+expodataset1$decl1 <- hms(expodataset1$decl1)
+expodataset1$decl1 <- period_to_seconds(expodataset1$decl1)
+
+# The calculated variables are then used for representing the celestrial map for the exoplanets
+ggplot(expodataset1, aes(r_asc1, decl1, color= meth)) + 
+  geom_point() + 
+  labs(title="Celestial Map for Exoplanets",
+       x="Right ascension (seconds)", 
+       y="Declination (seconds)") +
+  scale_color_discrete(name="Method of \nDiscovery")
+
+#plotting with cluster types
+ggplot(expodataset1, aes(r_asc1, decl1, color= type)) + 
+  geom_point() + 
+  labs(title="Celestial Map for Exoplanets with Types",
+       x="Right ascension (seconds)", 
+       y="declination (seconds)") +
+  scale_color_discrete(name="Cluster types")
+
+
+```
+
+##### 10. Create an animated time series where multiple lines illustrate the evolution over time of the total number of exoplanets discovered for each method up to that year.
+
+```{r animate, warning=FALSE,message=FALSE}
+
+# A new variable is created which would be used in animating the values
+exoplanets_count <- expodataset %>%
+            group_by(meth, year) %>%  
+            summarise(Count = length(meth)) %>%
+            mutate(Count = cumsum(Count))
+
+# we remove any empty values in the cariable
+exoplanets_count <- na.omit(exoplanets_count)
+
+# the time series plot is created with the new variable
+time_series<-ggplot(exoplanets_count, aes(x = year, y = Count, group = meth)) + 
+  geom_point() +
+  geom_line(aes(color = meth)) +
+  transition_reveal(year) + 
+  labs(title = 'Evolution of exoplanets discovered by methods', 
+       subtitle = 'Year: {frame_along}',
+       x = 'Year',
+       y = 'Count of discovery') +
+  scale_color_discrete(name="Method of \nDiscovery")
+
+# the plot is rendered to create animation
+animation <- animate(time_series, renderer = gifski_renderer(loop = T))
+animation
+
+```
+
+```{r animate1}
+# The individual method animation plot can be creating by adding facet_wrap to the ggplot 
+time_series1<-ggplot(exoplanets_count, aes(x = year, y = Count, group = meth)) + 
+  geom_point() +
+  geom_line(aes(color = meth)) + 
+  facet_wrap(~meth) +
+  transition_reveal(year) + 
+  labs(title = 'Evolution of exoplanets discovered by methods', 
+       subtitle = 'Year: {frame_along}',
+       x = 'Year',
+       y = 'Count of discovery') +
+  scale_color_discrete(name="Method of \nDiscovery")
+
+# the plot is rendered to create animation
+animation1 <- animate(time_series1, renderer = gifski_renderer(loop = T))
+animation1
+
+
+```
+
+
+##### 11. Create an interactive plot with Shiny where you can select the year (slider widget, with values ≥ 2009) and exoplanet type. Exoplanets appear as points on a scatterplot (log-mass vs log-distance coloured by method) only if they have already been discovered. If type is equal to all all types are plotted together.
+
+Shiny can be used for creating an interactive plot with default values in the plot. In this plot, default values of year and type is added. Once the plot is created, we can update the plot by updating the value of year or cluster type in the interactive mode and update the plot as required.
+
+```{r shinyapp,warning=FALSE,message=FALSE}
+#max year value
+maxyr <-  max(expodataset1$year,na.rm = T)
+
+ui <- shinyUI(  #UI function for front end
+    fluidPage(
+      # Application title
+    titlePanel("Exoplanet Discovery"),
+
+    # Sidebar with a slider input for Year and Type of exoplanet
+    sidebarLayout(
+        sidebarPanel(
+            sliderInput("year",       # Name of the input slider
+                        "Year:",      # Label
+                        min = 2009,   # minimum value of the slider
+                        max = maxyr,  # max value of the slider
+                        value = 2010, # initial value
+                        step = 1),    # increment of the input by 1
+            
+            selectInput("type",       # Name of input choice   
+                        label = "Type:",    # Label
+                        choices = c('hot_jupiters', 'cold_gas_giants', 'Rocky', 'others','All'),   # Combination of choices
+                        selected = 'cold_gas_giants')     # default value
+        ),
+
+        # Show a plot of the generated scatter points
+        mainPanel(
+           plotOutput("scatterplot")   # scatterplot display
+        )
+    )
+  )
+)
+
+server <- function(input, output) {          #server function for backend
+    output$scatterplot <- renderPlot({
+      
+        # generating dataset based on inputs from ui block
+        x <- reactive({
+                      if(input$type != 'All'){
+                        expodataset1[((expodataset1$year <= input$year) & (expodataset1$type == input$type)),]  
+                      }
+                      else {
+                        expodataset1[(expodataset1$year <= input$year),]
+                      }
+                       
+                      })
+       
+        # plotting function based on the dataset
+        ggplot(x(), aes(x= log(mass),y = log(dist), color = meth)) +
+          geom_point(na.rm=TRUE) +
+            labs(
+                 title = "Plot of Exoplanets discovered over years",
+                 x = 'Log - Mass',
+                 y = 'Log - Distance') +
+          scale_color_discrete(name="Method of \nDiscovery")
+          
+    })
+}
+# function for running the shiny app
+shinyApp(ui, server)
+
+```
+
+
+
+##### 12. Fit a linear regression model where log period is the response variable and the logs of host_mass, host_temp and axis are the covariates (exclude rows that contain at least one missing value). Include an intercept term in the regression model.
+
+```{r lm}
+
+# dropping empty values
+expodataset2 <- expodataset1 %>% drop_na(mass,temp,axis)
+
+#fitting the linear regression model
+fitlm <-lm(log(period) ~ log(mass) + log(temp) + log(axis), data = expodataset2)
+#printing the summary of the fit
+summary(fitlm)
+```
+
+From the summary statistics of the fitted model on log-period with covariates of log-mass,log-temp and log-axis, we see that all the three covariates are highly significant as 99% confidence level. A change in any of these three variables will impact the response variable period of the exoplanets. 
+
+The linear model expression of the given model is,
+
+```{r expression}
+#code block for printing the fit expression
+  cat("log(period) =",fitlm$coefficients[1],fitlm$coefficients[2],"*log(mass)",fitlm$coefficients[3],"*log(temp) + ",fitlm$coefficients[4],"*log(axis)")
+```
+
+So, one unit increase in mass or temp will have a negative impact on the period of the exoplanets,keeping all other elements constant. With one unit increase in axis variable will have a positive impact on the period response variable,keeping all other variables constant.
+
+The period variable in this dataset depicts the orbital period of the planet. From this model fit, we see that the covariates - mass, temp and axis are highly significant to the response variable period. This depicts that the orbital period of the planet will be affected if there are any change in the mass or temperature or axis of the planet. 
+
+This model has an adjusted R-squared value as 0.9918. This shows that model is fitted very well and all the three covariates contribute very much to the response variable.
+
+##### 13. Include in your RMarkdown document some model summaries and an interpretation of the model you have fit.
+
+```{r lmplot}
+
+#Anova table
+anova(fitlm)
+
+```
+Type 1 Analysis of Variance determines whether there is any statistically significant difference in the model by introducing new variables one by one to the model. The anova table shows that there is high significance by adding log - mass to the model. So it can be added to the model. Now, the
+second variable log - temp is added to the existing model and the table is compared to check if the new variable fits in the model. If the variable fits, then the next variable until last variable is added to the existing model and compared. So, it works in a sequential way with one variable at a time.
+
+From the above table, all the three covariates have a higher significance on the response variable. So, these covariates can be used to model the dataset.
+
+We can have a look at the qqplot to check the linear regression fit of the covariates on the response variable log - period.
+
+```{r qqplot}
+
+#this can be used for representing several plots related to residuals and diagnostics of the model.
+#plot(fitlm)
+
+#QQ Plot
+qqnorm(rstudent(fitlm))
+qqline(rstudent(fitlm),col=2)
+
+
+```
+
+From the QQ plot, we see that the model is fit linearly and it is a best fit with the residuals from the provided covariates. But, it is also noted that there are few outliers in the dataset which can be removed if required. There points can be verified using the Cook's distance method. If there are outliers in the dataset, it can be removed and the model can be refitted with the updated values of the dataset.
+
+We can also produce different models with more covariates and check the efficiency of this model using AIC,BIC or Chi squared tests and find the best model.
+
+
+##### 14. Embed the Shiny app from (11) in your RMarkdown document.
+
+The Shiny app is created using interactive plots is embedded in the part 11. This plot can be visualized by running the rmd document in the html format and relevant values for years and exoplanets type can be adjusted in the interactive version of the plot.  
+ 

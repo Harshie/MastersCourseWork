@@ -1,0 +1,223 @@
+---
+title: "STAT40830 - Final Project"
+author: "Kiran Siddeshwar, 19200062"
+date: "04/08/2020"
+output: html_document
+---
+
+```{r}
+#Clearing up the environment and setting a seed for easy replication of results:
+rm(list=ls())
+set.seed('19200062')
+
+#Loading required libraries:
+library(readr)
+library(dplyr)
+library(magrittr)
+library(ggplot2)
+library(shiny)
+library(ggiraph)
+library(gganimate)
+library(reshape2)
+library(tibble)
+library(tidyr)
+library(lubridate)
+library(ggmap)
+library(png)
+library(gifski)
+```
+
+**1. Import the dataset exo_data.csv as a tibble. Columns 1, 16, 17, 18, 25 should be characters. Columns 2, 14 should be factors. Column 15 should be integers. The remaining columns should be doubles.**
+
+```{r}
+#Importing the evo_data as a tibble and storing in a variable exodat:
+exodat<-read_csv("exo_data.csv")
+class(exodat)
+is_tibble(exodat)
+
+str(exodat)
+
+#Identifying the column names to convert to respective datatypes:
+colnames(exodat[,c(1,16,17,18,25)])
+exodat$id %<>% as.character
+exodat$recency %<>% as.character
+exodat$r_asc %<>% as.character
+exodat$decl %<>% as.character
+exodat$lists %<>% as.character
+
+colnames(exodat[,c(2,14)])
+exodat$flag %<>% as.factor
+exodat$meth %<>% as.factor
+
+colnames(exodat[,15])
+exodat$year %<>% as.integer
+
+```
+
+**2. Exclude the exoplanets with an unknown method of discovery.**
+
+```{r}
+#drop_na() is a function in the dplyr package used to remove missing values.
+
+#Using drop_na() to drop rows containing missing values (unknown) of the method variable:
+exodat<-exodat %>% drop_na(meth)
+
+#We can observe that 63 observations have been dropped, now we have 3596 observations.
+```
+
+**3. Create a graphic which illustrates the relationship between the log-distances from the Sun and the methods of discovery.**
+
+```{r}
+p <- ggplot(exodat, aes(x = log(dist), fill = meth, color = meth))
+p <- p + geom_histogram(position = "identity")
+p <- p + labs(title = "Plot of log-distance from Sun", x = "Log-distance from Sun (parsec)", y = "Frequency")
+p
+```
+
+**4. Create scatterplots of the log-mass versus log-distances, separating by methods of discovery. Hovering with the cursor highlights the point and displays its name, and, if you click, the exoplanet’s page on the Open Exoplanet Catalogue will be opened.**
+
+```{r}
+exodat$onclick <- sprintf("window.open(\"%s%s\")",
+                          "http://www.openexoplanetcatalogue.com/planet/",
+                          exodat$id)
+
+scatter_plot = ggplot(exodat,
+                      aes(x = log(mass),
+                          y = log(dist),
+                          color = meth)) +
+                      labs(title = "Log-mass vs. Log-distances",
+                           x = "Log-mass",
+                           y = "Log-distances") +
+                      geom_point_interactive(aes(data_id = id,
+                                                 tooltip = id,
+                                                 onclick = onclick)) +
+                      scale_color_discrete(name = "Method of discovery")
+
+ggiraph(code = print(scatter_plot))
+```
+
+**5. Rename the radius into jupiter_radius, and create a new column called earth_radius which is 11.2 times the Jupiter radius.**
+
+```{r}
+exodat <- exodat %>% rename(jupiter_radius = radius) # rename() function from tidyverse with pipe.
+
+exodat <- exodat %>% mutate(earth_radius = (jupiter_radius*11.2))
+```
+
+**6. Focus only on the rows where log-earth radius and log-period have no missing values, and perform kmeans with four clusters on these two columns.**
+
+```{r}
+# Focus only on the rows where radius of Earth and period have no missing values
+exodat2 <- exodat %>% drop_na(earth_radius, period)  # 2732 obs
+
+#log-radius of Earth and log-period
+exodat2 <- exodat2 %>%
+            mutate(LogEarthRadius = log(earth_radius),
+                   LogPeriod = log(period))
+
+# data to perform Kmeans
+model.kmeans <- exodat2 %>% 
+                  select(LogEarthRadius, LogPeriod)
+
+# perform k-means
+fitk  <- kmeans(model.kmeans, 4)
+
+table(fitk$cluster)
+```
+
+**7. Add the clustering labels to the dataset through a new factor column called type, with levels rocky, hot_jupiters, cold_gas_giants, others; similarly to https://en.wikipedia.org/wiki/Exoplanet#/media/File:ExoplanetPopulations-20170616.png and produce the scatterplot highlighting these clusters.**
+
+```{r}
+fitk$cluster <- as.factor(fitk$cluster)
+
+ggplot(model.kmeans, aes(LogPeriod, LogEarthRadius, color = fitk$cluster)) + 
+  geom_point() + 
+  labs(title="Clustering solutions of Exoplanets")
+
+exodat2$type <- fitk$cluster
+exodat2$type <- as.numeric(exodat2$type)
+
+exodat2$type[exodat2$type == 1] <- "cold_gas_giants"
+exodat2$type[exodat2$type == 2] <- "others"
+exodat2$type[exodat2$type == 3] <- "Rocky"
+exodat2$type[exodat2$type == 4] <- "hot_jupiters"
+
+table(fitk$cluster)
+table(exodat2$type)
+```
+
+**8. Use a violin plot to illustrate how these clusters relate to the log-mass of the exoplanet.**
+
+```{r}
+ggplot(exodat2, aes(x = type, y = log(mass))) + 
+      geom_violin() +
+      labs(title = "Violin plot of log-mass of the exoplanet")
+```
+
+**9. Transform r_asc and decl into two new variables that are the same varibales but in values of seconds. Use these as coordinates to represent a celestial map for the exoplanets.**
+
+```{r}
+head(exodat$r_asc)
+head(exodat$decl)
+
+exodat$r_asc <- gsub(" ", ":", exodat$r_asc, fixed = TRUE) # convert to hh:mm:ss
+exodat$r_asc <- hms(exodat$r_asc)
+
+exodat$r_asc_sec <- period_to_seconds(exodat$r_asc)
+
+# convert Declination to seconds and save as decl_sec
+exodat$decl <- gsub(" ", ":", exodat$decl, fixed = TRUE) # convert to dd:mm:ss, where dd=3600ss
+exodat$decl <- hms(exodat$decl) # for Decl, dd is similar to hh where :=3600ss
+
+exodat$decl_sec <- period_to_seconds(exodat$decl)
+
+# scatter plot represents a celestial map for the exoplanets
+ggplot(exodat, aes(r_asc_sec, decl_sec, color= meth)) + 
+  geom_point() + 
+  labs(title="Celestial Map for Exoplanets",
+       x="Right ascension (seconds)", 
+       y="declination (seconds)")
+```
+
+**10. Create an animated time series where multiple lines illustrate the evolution over time of the total number of exoplanets discovered for each method up to that year.**
+
+```{r}
+ts.data <- exodat %>%
+            group_by(meth, year) %>%  
+            summarise(Count = length(meth)) %>%
+            mutate(Count = cumsum(Count))
+
+ts.data <- na.omit(ts.data)
+
+ggplot(ts.data, aes(x = year, y = Count, group = meth)) + 
+  geom_line(aes(color = meth)) + 
+  geom_point(size = 2) + 
+  transition_reveal(year) + 
+  labs(title = 'Evolution Total number of exoplanets discovered by methods', 
+       y = 'Number Discovered')
+
+```
+
+**11. Create an interactive plot with Shiny where you can select the year (slider widget, with values >= 2009) and exoplanet type. Exoplanets appear as points on a scatterplot (log-mass vs log-distance coloured by method) only if they have already been discovered. If type is equal to all all types are plotted together.**
+
+```{r}
+
+```
+
+**12. Fit a linear regression model where log period is the response variable and the logs of host_mass, host_temp and axis are the covariates (exclude rows that contain at least one missing value). Include an intercept term in the regression model.**
+
+```{r}
+
+```
+
+**13. Include in your RMarkdown document some model summaries and an interpretation of the model you have fit.**
+
+```{r}
+
+```
+
+**14. Embed the Shiny app from (11) in your RMarkdown document.**
+
+```{r}
+
+```

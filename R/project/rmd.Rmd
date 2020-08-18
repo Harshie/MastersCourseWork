@@ -1,0 +1,488 @@
+---
+title: "Advance Programming with R- Final Project"
+author: "Manikandan Ravichandran 19200314"
+date: "15/08/2020"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r lib, warning=FALSE,results='hide'}
+library(readr)
+library(tibble)
+library(tidyr, warn.conflicts = FALSE)
+library(magrittr, warn.conflicts = FALSE)
+library(dplyr, warn.conflicts = FALSE)
+library(ggplot2)
+library(ggiraph)
+library(stringr)
+library(gganimate)
+library(shiny, warn.conflicts = FALSE)
+library(lubridate, warn.conflicts = FALSE) # A part of tidyverse used for date manipulation in Q10
+set.seed("19200314")
+```
+
+## Question 1:
+
+**Import the dataset exo_data.csv as a tibble. Columns 1, 16, 17, 18, 25 should be characters. Columns 2, 14 should be factors. Column 15 should be integers. The remaining columns should be doubles. Note: the file metadata.txt contains useful information about this dataset. Also, you may consult https://en.wikipedia.org/wiki/Exoplanet**
+
+```{r q1}
+exo_data_input<-read_csv("exo_data.csv", col_names = TRUE,
+         col_types = cols(year=col_integer(),
+                          age=col_double(),
+                          meth=col_factor(levels = NULL, ordered = FALSE, include_na = FALSE),
+                          flag=col_factor(NULL)),
+         locale = default_locale(), na = c("", "NA"), quoted_na = TRUE,
+         quote = "\"", comment = "", trim_ws = TRUE, skip = 0,
+         progress = show_progress(), skip_empty_rows = TRUE)
+
+
+exo_data<-exo_data_input #creating a working set
+
+exo_data <-exo_data %>%  mutate_at(vars(meth,flag), factor)
+#str(exo_data$meth)
+#str(exo_data$flag)
+str(exo_data)
+
+```
+
+## Question 2:
+
+**Exclude the exoplanets with an unknown method of discovery.**
+
+```{r q2}
+which(is.na(exo_data$meth)) # To check how many observation has unknown method of discovery
+
+exo_data<-exo_data %>% filter(complete.cases(exo_data[ , 14])) #Removing hte unknown meths
+```
+
+## Question 3:
+
+**Create a graphic which illustrates the relationship between the log-distances from the Sun and the methods of discovery**
+
+```{r q3,warning=FALSE}
+g1<-ggplot(aes(y = log(dist), x = meth,colour=meth), data = exo_data)+
+  labs(
+    title = "Log-distances from the Sun VS Methods of discovery.",
+    x = 'Methods of discovery',
+    y = 'Log-distances from the Sun')+
+    scale_color_discrete(name="Methods of \nDiscovery")+
+  geom_boxplot()
+
+# Printing the graphic which illustrates the relationship between the log-distances from the Sun and the methods of discovery 
+g1
+```
+
+
+## Question 4:
+
+**Create scatterplots of the log-mass versus log-distances, separating by methods of discovery. Hovering with the cursor highlights the point and displays its name, and, if you click, the exoplanet’s page on the Open Exoplanet Catalogue will be opened.**
+
+```{r q4, warning=FALSE}
+# creating an 'onclick' column - window.open is javascript
+exo_data$catalogue <- sprintf("window.open(\"%s%s\")",
+                           "http://www.openexoplanetcatalogue.com/planet/",
+                           as.character(exo_data$id))
+
+# Plot with the higlights and onclick urls
+g2 <- ggplot(exo_data, aes(log10(mass),log10(dist), colour = as.factor(meth))) +
+  xlab('Log-Masses') +
+  ylab('Log-distances from the Sun') +
+  scale_color_discrete(name="Methods of \nDiscovery")
+
+
+#on click and Interactive points of ggplot-scatterplot
+p2 <- g2 + geom_point_interactive(aes(tooltip = id,
+                                     data_id = id,
+                                     onclick = catalogue),alpha=0.5,
+                                 size = 1.5)
+ggiraph(code = print(p2), width = 0.8,tooltip_opacity = 0.5)
+
+```
+
+## Question 5:
+
+**Rename the radius into jupiter_radius, and create a new column called earth_radius which is 11.2 times the Jupiter radius.**
+
+```{r q5,warning=FALSE}
+
+exo_data<-exo_data %>% rename(jupiter_radius = 4) %>% #Renaming radius to jupiter_radius
+  mutate(earth_radius = jupiter_radius*11.2) #Creating new column earth_radius
+
+head(exo_data) #TO view the first few observation of the dataset
+```
+
+## Question 6:
+
+**Focus only on the rows where log-earth radius and log-period have no missing values, and perform kmeans with four clusters on these two columns.**
+
+```{r q6}
+exo_data<-exo_data %>% 
+  filter(complete.cases(exo_data[,c(5,27)])) # Removing missing values in the 2 columns
+
+exo_data_kmeans<-exo_data %>% 
+  transmute(period = log(period),earth_radius = log(earth_radius)) # Temporarty dataset for k means
+
+# run k-means  qith 4 culsters
+fitkm <- kmeans(exo_data_kmeans, centers = 4)
+# examine the results
+#fitkm
+```
+
+We could now visualise the number of datapoints on each clusters available:
+
+```{r q6a}
+table(fitkm$cluster)
+```
+
+## Question 7:
+
+**Add the clustering labels to the dataset through a new factor column called type, with levels rocky, hot_jupiters, cold_gas_giants, others;**
+
+```{r q7}
+exo_data$cluster <-fitkm$cluster #adding the clustering values of k means to the dataset
+#str(exo_data)
+
+#Creating the clustering labels to a new factor column
+exo_data$cluster[exo_data$cluster == 4] <- "others"
+exo_data$cluster[exo_data$cluster == 3] <- "hot_jupiters"
+exo_data$cluster[exo_data$cluster == 2] <- "cold_gas_giants"
+exo_data$cluster[exo_data$cluster == 1] <- "Rocky"
+
+exo_data$cluster <-as.factor(exo_data$cluster) # COnverting the clustering lables to factors
+
+#producing the scatterplot highlighting these clusters with different colours.
+g3<-ggplot(exo_data, aes(log10(period),log10(earth_radius),col=cluster)) + 
+  labs(
+    title = "Log- Earth Radius VS Log- period",
+    y = 'Log-Earth Radius',
+    x = 'Log- period')
+
+p3 <- g3 + geom_point_interactive(aes(tooltip = id),
+                                  size = 2,alpha=0.7) # Interaction points to highlight the id 
+ggiraph(code = print(p3), width = 0.8)
+
+table(exo_data$cluster) # Table displaying the number of exoplanets in each Category.
+```
+
+
+## Question 8:
+
+**Use a violin plot to illustrate how these clusters relate to the log-mass of the exoplanet.**
+
+```{r q8}
+ggplot(exo_data, aes(x = cluster, y = log(mass),col=cluster)) + 
+  geom_violin(na.rm=TRUE) +
+  xlab('Cluster Types') +
+  ylab('Log-Mass') +
+  labs(title = "Violin plot of log-mass of the exoplanet")
+```
+
+In the violin plot, the width determines the frequency just similar to the box plot representation.
+
+In the case of Hot Jupiters, The Median has a log mass distributed along 0 and the values range between -2.5 and 2.5 while most of the data points are distributed along the median. Similarly, Others and the rocky also seem to be having most of its data points distributed along the median. But in the case of cold gas giants, The Frequency of the data points is roughly equally distributed throughout the range of its interval.
+
+## Question 9:
+
+**Transform r_asc and decl into two new variables that are the same varibales but in values of seconds. Use these as coordinates to represent a celestial map for the exoplanets.**
+
+```{r q9,warning=FALSE}
+
+#Computing the r_asc into seconds
+exo_data<-exo_data %>%
+  separate(r_asc, c("hh", "ss"), sep = " (?=[^ ]+$)", remove = FALSE)%>%
+  separate(hh, c("hh", "mm"), remove = TRUE,convert = TRUE)
+
+exo_data<-exo_data %>%
+  mutate(r_asc_sec = (hh*60+mm)*60+ as.double(ss),.keep ="unused")
+
+#Computing the decl into seconds
+exo_data<-exo_data %>%
+  separate(decl, c("hh", "ss"), sep = " (?=[^ ]+$)", remove = FALSE)%>%
+  separate(hh, c("sg","hh", "mm"), remove = TRUE,convert = TRUE)%>%
+  mutate(sg = str_sub(decl, 1,1))
+
+exo_data<-exo_data %>%
+  mutate(decl_sec = (hh*60+mm)*60+ as.double(ss),.keep ="unused")
+
+exo_data<-exo_data %>%mutate(decl_seconds = ifelse(sg =="-", decl_sec*-1,
+                    ifelse(sg =="+", decl_sec*+1, NA)),.keep ="unused")
+
+#str(exo_data$r_asc_sec)
+#str(exo_data$decl_seconds)
+
+# plotting the celestial map 
+ggplot(exo_data, aes(x=r_asc_sec, y=decl_seconds, colour = as.factor(cluster))) +
+  geom_point()+ 
+  labs(
+    title = "Celestial map of Exoplanets.",
+    x = 'Declination (Seconds ss)',
+    y = 'Right ascension (Seconds ss)')+
+  facet_wrap(~cluster)+
+  stat_smooth()+
+  scale_color_discrete(name="Methods of \nDiscovery")
+```
+
+
+## Question 10:
+
+**Create an animated time series where multiple lines illustrate the evolution over time of the total number of exoplanets discovered for each method up to that year.**
+
+Animated time series to illustrate the evolution over time of the total number of exoplanets discovered for each method:
+
+```{r 10a}
+counter_exo <- exo_data_input %>%
+            group_by(meth, year) %>%  
+            summarise(Count = length(meth)) %>%
+            mutate(Count = cumsum(Count)) # Computing the couts of by grouping the year and method of discovery
+
+counter_exo <- na.omit(counter_exo) # Removing the Missing variable oberservations
+
+g_animi<-ggplot(counter_exo, aes(x = year, y = Count, group = meth)) +
+  geom_point() +
+  geom_line(aes(color = meth)) +
+  facet_wrap(~meth) +
+  transition_reveal(year) +
+  labs(title = 'Evolution of exoplanets discovered for each methods',
+       subtitle = 'Year: {frame_along}',
+       x = 'Year',
+       y = 'Total Count of discovery')
+
+
+animi <- animate(g_animi, renderer = gifski_renderer(loop = T)) # Creating Animations 
+animi
+```
+
+Animated time series to illustrate the evolution over time of the total number of exoplanets discovered for each Cluster category:
+
+```{r 10b}
+post_month_year1 <- exo_data %>%
+  group_by(year, cluster) %>%
+  summarise(total.posts = n()) # Computing the Temporary dataset to animate the total number of exoplanets
+# Processing datasets to aquire the count based on the dates and clusters
+nmax<-nrow(post_month_year1)
+rsum<-0
+osum<-0
+hsum<-0
+csum<-0
+meth<- vector()
+year <- vector()
+n <- vector()
+
+for (i in 1:nmax){
+  if (post_month_year1$cluster[i] =="Rocky"){
+    rsum<-rsum+post_month_year1$total.posts[i]
+    n[i]<-rsum
+    meth[i]<-post_month_year1$cluster[i]
+    year[i]<-post_month_year1$year[i]
+  }
+  else if(post_month_year1$cluster[i] =="others"){
+    osum<-osum+post_month_year1$total.posts[i]
+    n[i]<-osum
+    meth[i]<-post_month_year1$cluster[i]
+    year[i]<-post_month_year1$year[i]
+  }
+  else if(post_month_year1$cluster[i] =="hot_jupiters"){
+    hsum<-hsum+post_month_year1$total.posts[i]
+    n[i]<-hsum
+    meth[i]<-post_month_year1$cluster[i]
+    year[i]<-post_month_year1$year[i]
+  }
+  else if(post_month_year1$cluster[i] =="cold_gas_giants"){
+    csum<-csum+post_month_year1$total.posts[i]
+    n[i]<-csum
+    meth[i]<-post_month_year1$cluster[i]
+    year[i]<-post_month_year1$year[i]
+  }
+}
+
+exo1 <- data.frame(year, meth, n) # Vectors to dataframe
+
+# Assigning Categorical lables of the factors
+exo1$meth[exo1$meth == 1] <- "cold_gas_giants"
+exo1$meth[exo1$meth == 2] <- "hot_jupiters"
+exo1$meth[exo1$meth == 3] <- "others"
+exo1$meth[exo1$meth == 4] <- "Rocky"
+
+exo1$year <- as.Date(as.character(exo1$year), "%Y") # CHarater to date convertion
+
+post_month_year2 <- exo1 %>%
+  mutate(year = floor_date(exo1$year, unit = 'year')) # Since the date format inherits a default day and month we are flooring it
+
+post_month_year2<-post_month_year2[-47,] # Removing NA Year
+
+
+combined_anim <- post_month_year2 %>%
+  ggplot(aes(year, n, group = meth, color = meth)) +
+  geom_line() +
+  geom_segment(aes(xend = as.Date('2019-01-01'), 
+                   yend = n), linetype = 2, colour = 'grey') +
+  geom_text(aes(x = as.Date('2019-01-01'), 
+                label = meth), hjust = 0) + 
+  geom_point(size = 2) + 
+  coord_cartesian(clip = 'off') +
+  scale_x_date(breaks = '3 year', date_labels = '%Y') +
+  labs(title = "Exoplanets Per cluster",
+       subtitle = "Time:{frame_along}",
+       x = "Year", y = 'Total Number of Exoplanets')+
+  theme_minimal() + 
+  theme(legend.position = 'none',
+        axis.title = element_text(size = 15),
+        axis.text = element_text(size = 12),
+        plot.title = element_text(size = 15),
+        plot.subtitle = element_text(size = 12)) +
+  transition_reveal(year)
+
+animate(combined_anim, nframes = 200, fps=10) # Creating Animations 
+```
+
+## Question 11:
+
+**Create an interactive plot with Shiny where you can select the year (slider widget, with values >= 2009) and exoplanet type. Exoplanets appear as points on a scatterplot (log-mass vs log-distance coloured by method) only if they have already been discovered. If type is equal to all all types are plotted together.**
+
+```{r q11}
+ui <- shinyUI(
+  fluidPage(
+    # Title of the Shiny Application
+    titlePanel("Discovery of Exoplanets"),
+    
+    # Sidebar with a slider input for Year and Type of exoplanet
+    sidebarLayout(
+      sidebarPanel(
+        sliderInput("year",
+                    "Year:",
+                    min = 2009,  # Minimum value is set to 2009
+                    max = max(exo_data$year,na.rm = T), # Maximum value is max of year in the dataset
+                    value = 2009, # Default value of year
+                    step = 1), # SLider increment value 
+        
+        selectInput("type",
+                    label = "Type:",
+                    choices = c('hot_jupiters', 'cold_gas_giants', 'Rocky', 'others','All'), # Choices in the dropdown
+                    selected = 'All') # Default dropdown value
+      ),
+      
+      # Show a plot of the generated distribution
+      mainPanel(
+        plotOutput("scatterPlot") # The Graphical representation block on the shiny app
+      )
+    )
+  )
+)
+
+server <- function(input, output) {
+  output$scatterPlot <- renderPlot({
+    
+    temp_dataset <- reactive({  # Using reactive to store the filtered dataset
+      if(input$type == 'All'){
+        exo_data[(exo_data$year <= input$year),]
+      }
+      else {
+        exo_data[((exo_data$year <= input$year) & (exo_data$cluster == input$type)),] 
+      }
+      
+    })
+    
+    # The graphical representeation of the filtered dataset 
+    ggplot(temp_dataset(), aes(x= log(mass),y = log(dist), color = meth)) +
+      geom_point(na.rm=TRUE) +
+      labs(
+        title = "Plot of Exoplanets discovered over years",
+        x = 'Log of Planetary mass',
+        y = 'Log of Distance from Sun')
+    
+  })
+}
+shinyApp(ui, server)
+```
+
+## Question 12:
+
+**Fit a linear regression model where log period is the response variable and the logs of host_mass, host_temp and axis are the covariates (exclude rows that contain at least one missing value). Include an intercept term in the regression model.**
+
+```{r q12}
+exo_data1<-exo_data %>% 
+  filter(complete.cases(exo_data[,c(6,20,23)])) # Removing missing values in the 2 columns
+
+# Fit a linear regression model
+linearMod <- lm(log(period) ~ log(axis) + log(host_mass) + log(host_temp), data=exo_data1) 
+
+# Summary of the fitted model
+summary(linearMod)
+```
+
+## Question 13:
+
+**Include in your RMarkdown document some model summaries and an interpretation of the model you have fit.**
+
+In the linear regression model of having the log period as the response variable and the logs
+of host_mass, host_temp and axis are the covariates we derive the linear regression model equation as,
+
+log(period)= 7.217845 + [1.483030 * log(axis)] + [-0.259993 * log(host_mass)] + [-0.157801 * log(host_temp)]
+
+Which means that the Response variable will have a default variation or effect of 7.217845 when all the other explanatory variable are fixed constant at zero.
+
+For instance, When there is a unit increase in the log(axis) there would be 1.483030 increase in the response variable while the rest of the explanatory variable remains constant.
+
+When there is a unit increase in the log(host_mass) there would be -0.259993 decrease in the response variable while the rest of the explanatory variable remains constant.
+
+When there is a unit increase in the log(host_temp) there would be 1.483030 decrease in the response variable while the rest of the explanatory variable remains constant.
+
+Based on the T-test value, The significance of the explanatory is predicted. We could predict that the log of axis and host mass is more significant with a probability of less than 0.01 on the 95% confidence interval. Which means that the both explanatory variable contributes more efficient to the response variable of the log of the period.
+
+Probability values are significantly low for all explainatory, which means that we can reject the null hypotheses that the respective covariates = 0 (reference threshold taken = 0.05).
+
+The Residual standard error: 0.2244 on 616 degrees of freedom, which is considerably less and doesn't possess any impact on the model.
+
+The Multiple R-squared of this model is 0.9796 which is 97%, and this R-Squared value of this model isn't a stable value to consider as it changes based on the variations in the dataset, hence we would consider to evaluate using the stable Adjusted R-squared which has the value of 0.9795.
+
+```{r q13}
+# Confidence interval of the Fitted model
+confint(linearMod)
+```
+
+The confidence interval of the regression model can determine the value between which the 95% or 25% of the sample space of the dataset population situated at.
+
+```{r q13a}
+# Residual Standard Error (RSE), or sigma:
+sigma(linearMod)/mean(log(exo_data$period))
+```
+
+The residual Standard error for the linear regression model is 0.09444977 which considerably calculates how much the data points spread around the regression line.
+
+```{r q13b}
+# Graphical Representation of the Fitted linear model
+#plot(linearMod)
+```
+
+In the Residuals Vs Fitted plot, We could see that most of the residuals are situated around the zero value where some of the data points are drifted away from the zero residuals which are leverage point or outliers.
+
+In the Normal Q-Q, we could see that most of the data points is converged to the linear regression model fitted line whereas some of the data points which are observed far away from the fitted line are said to be leverage points in the dataset.
+
+The residuals Vs Leverage Plot is useful to identify the leverage points using the cooks distance. The data points which are observed beyond the cook's distance boundaries are considered to be as leverage points. These points which are beyond the cook's distance boundaries affect the accuracy and the fit of the model.
+
+```{r q13c}
+#Goodeness of fitn values of AIC
+AIC(linearMod)
+BIC(linearMod)
+```
+
+In order to determine which model is best suited for the dataset, We would consider the evaluation of the model using goodness of fit values such as AIC and BIC. Whereas BIC stays fixed, AIC varies based on the sample population of the dataset.
+
+```{r q13d}
+#Initialising a stepwise AIC Calculation by performing backward elimination
+    # in order to automatically remove inappropriate terms:
+library(MASS, warn.conflicts = FALSE)
+summary(stepAIC(linearMod))
+```
+
+Due to the varying AIC values based on the sample population of the dataset, We might consider the stepwise AIC Calculation by performing backward elimination in order to automatically remove inappropriate terms and to evaluate the AIC values.
+
+## Question 14:
+
+**Embed the Shiny app from (11) in your RMarkdown document**
+
+**The Output is available in the Question 11.**
