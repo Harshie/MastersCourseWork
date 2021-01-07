@@ -1,0 +1,73 @@
+---
+title: "Grocery Analysis"
+author: "Harshad Kumar Elangovan"
+date: "26/12/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Groceries Dataset from 'arules' package
+
+```{r loadData}
+
+library(arules)
+
+data("Groceries")
+
+#?Groceries
+
+class(Groceries)
+
+print(Groceries)
+
+inspect(Groceries[1:3])
+
+```
+
+We will set the support and confidence for the provided dataset.
+
+```{r rules}
+
+rules <-apriori(Groceries,parameter =list(support =0.01,confidence =0.5))
+
+# extract quality measures
+qual <-quality(rules)
+
+```
+
+We will compute the probabilities and standardized lift
+
+```{r lift}
+
+# compute p(A) and p(B)
+pA <-qual$support/qual$confidence
+pB <-qual$confidence/qual$lift
+
+# compute lift upper and lower bounds
+U <-apply(cbind(1/pA,1/pB),1, min)
+L <-apply(cbind(1/pA+1/pB-1/(pA*pB),0.01/(pA*pB),0.5/pB,0),1, max)
+
+sLift <-(qual$lift-L)/(U-L)# standardized lift
+data.frame(rule =labels(rules), sLift)# print rules and sLift
+
+
+```
+
+# Association Rule Visualization
+
+```{r visualization}
+
+
+rules <-apriori(Groceries,parameter =list(support =0.01,confidence =0.2))
+sub_rules <-head(rules,n =10,by ="lift")# extract top 10 rules with largest lift
+inspect(sub_rules)# inspect
+
+#install.packages('arulesViz')
+
+library(arulesViz)# load package
+
+plot(sub_rules,method ="graph")
+```
